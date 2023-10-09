@@ -11,6 +11,10 @@ const helmet = require('helmet')
 const authMiddleware = require('./middlewares/auth/authentication')
 const numCPUs = __config.clusterNumber || 0
 const fs = require('fs')
+const fileUpload = require('express-fileupload')
+const myToken = process.env.MY_TOKEN
+const token = process.env.TOKEN
+const axios = require('axios')
 
 class httpApiWorker {
   constructor () {
@@ -35,7 +39,7 @@ class httpApiWorker {
     vm.app.use(helmet({
       noCache: true
     }))
-
+    vm.app.use(fileUpload())
     const sixtyDaysInSeconds = 5184000
     vm.app.use(helmet.hsts({
       maxAge: sixtyDaysInSeconds
@@ -90,6 +94,68 @@ class httpApiWorker {
     }))
     authMiddleware.initialize(vm.app)
     require('./routes')(vm.app)
+
+    vm.app.listen(process.env.WEBHOOK_PORT || 1337, () => console.log('webhook is listening'))
+
+    vm.app.get('/webhook', (req, res) => {
+      const mode = req.query['hub.mode']
+      const challenge = req.query['hub.challenge']
+      const token = req.query['hub.verify_token']
+
+      if (mode && token) {
+        if (mode == 'subscribe' && token == myToken) {
+          res.status(200).send(challenge)
+        } else {
+          res.status(403)
+        }
+      }
+    })
+
+    vm.app.get('/', (req, res) => {
+      res.status(200).send('Welcome to the webhook')
+    })
+
+    // vm.app.post("/webhook", (req, res) => {
+    //   // Parse the request body from the POST
+    //   let body = req.body;
+
+    //   // Check the Incoming webhook message
+    //   console.log(JSON.stringify(body, null, 2));
+
+    //   // info on WhatsApp text message payload: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#text-messages
+    //   if (req.body.object) {
+    //     if (
+    //       body.entry &&
+    //       body.entry[0].changes &&
+    //       body.entry[0].changes[0] &&
+    //       body.entry[0].changes[0].value.messages &&
+    //       body.entry[0].changes[0].value.messages[0]
+    //     ) {
+    //       let phone_number_id =
+    //         body.entry[0].changes[0].value.metadata.phone_number_id;
+    //       let from = body.entry[0].changes[0].value.messages[0].from; // extract the phone number from the webhook payload
+    //       let msg_body = body.entry[0].changes[0].value.messages[0].text.body; // extract the message text from the webhook payload
+    //       axios({
+    //         method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+    //         url:
+    //           "https://graph.facebook.com/v12.0/" +
+    //           phone_number_id +
+    //           "/messages?access_token=" +
+    //           token,
+    //         data: {
+    //           messaging_product: "whatsapp",
+    //           to: from,
+    //           text: { body: "This is your message: " + msg_body },
+    //         },
+    //         headers: { "Content-Type": "application/json" },
+    //       });
+    //     }
+    //     res.sendStatus(200);
+    //   } else {
+    //     // Return a '404 Not Found' if event is not from a WhatsApp API
+    //     res.sendStatus(404);
+    //   }
+    // });
 
     vm.app.use((req, res, next) => {
       const err = new Error('Not Found')

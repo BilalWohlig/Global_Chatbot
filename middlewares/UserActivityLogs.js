@@ -10,8 +10,8 @@ const userActivityLogMiddleware = (req, body) => {
     formedJson.path = req.originalUrl
     formedJson.headers = req.headers
     formedJson.responseBody = body
-    //  UserActivityLogs.userActivitySaveToMongo(formedJson)
-    UserActivityLogs.userActivitySaveToElastic(formedJson)
+    UserActivityLogs.userActivitySaveToMongo(formedJson)
+    // UserActivityLogs.userActivitySaveToElastic(formedJson)
     return 1
   } catch (e) {
     console.debug('userActivityLogMiddleware >>>>>>>> error in try catch :: ', e)
