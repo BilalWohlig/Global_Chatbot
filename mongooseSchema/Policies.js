@@ -10,6 +10,9 @@ const schema = new Schema(
       type: String,
       enum: ['Uploaded to Pinecone', 'Saved in DB'],
       default: 'Saved in DB'
+    },
+    name: {
+      type: String
     }
   },
   { timestamps: true }

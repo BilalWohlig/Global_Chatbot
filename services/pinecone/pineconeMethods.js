@@ -18,6 +18,8 @@ const QnA = require('../../mongooseSchema/QnA.js')
 const DocumentId = require('../../mongooseSchema/DocumentId.js')
 const axios = require('axios')
 const ObjectId = require('mongoose').Types.ObjectId
+const fs = require('fs')
+const base64 = require('base-64')
 
 class PineconeChatbot {
   async sleep (ms) {
@@ -60,6 +62,18 @@ class PineconeChatbot {
     return 'Deleted'
   }
 
+  async deleteSpecificVectorsFromNamespace (indexName, policyId) {
+    const index = pinecone.Index(indexName)
+    await index.delete({
+      deleteRequest: {
+        filter: {
+          policyId: { $eq: policyId }
+        }
+      }
+    })
+    return 'Deleted'
+  }
+
   async receiveUserMessage (requestBody) {
     const token = process.env.TOKEN
     // Parse the request body from the POST
@@ -80,44 +94,99 @@ class PineconeChatbot {
         const phone_number_id =
           body.entry[0].changes[0].value.metadata.phone_number_id
         const from = body.entry[0].changes[0].value.messages[0].from // extract the phone number from the webhook payload
-        const msg_body = body.entry[0].changes[0].value.messages[0].text.body // extract the message text from the webhook payload
-        let docId = true
         const userWhatsappId = body.entry[0].changes[0].value.contacts[0].wa_id
-        const user = await User.findOne({ mobile: userWhatsappId })
-        let objectId
-        let msgToBeSent = ''
-        try {
-          objectId = new ObjectId(msg_body)
-          if (objectId.toString() == msg_body) {
-            docId = true
-            if (user.insuranceDocs.includes(objectId.toString())) {
-              msgToBeSent = 'Please ask your question related to ' + msg_body
-            } else {
-              msgToBeSent =
-                'Invalid Document Id. Please upload your document and try again'
-            }
+        const user = await User.findOne({ mobile: userWhatsappId }).populate(
+          'insuranceDocs'
+        )
+        const userDocIds = user.insuranceDocs.map((userDoc) => {
+          return userDoc._id.toString()
+        })
+        if (body.entry[0].changes[0].value.messages[0].type == 'text') {
+          const msg_body = body.entry[0].changes[0].value.messages[0].text.body
+          if (msg_body == 'start' || msg_body == 'Start' || msg_body == 'change' || msg_body == 'Change') {
+            const allUserDocs = user.insuranceDocs
+            const userOptions = []
+            allUserDocs.forEach((doc) => {
+              const obj = {
+                id: doc._id.toString(),
+                title: doc.name
+              }
+              userOptions.push(obj)
+            })
+            axios({
+              method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                'https://graph.facebook.com/v18.0/' +
+                phone_number_id +
+                '/messages',
+              data: {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: from,
+                type: 'interactive',
+                interactive: {
+                  type: 'list',
+                  header: {
+                    type: 'text',
+                    text: 'Chatbot'
+                  },
+                  body: {
+                    text: 'Please specify which document you have a question about.'
+                  },
+                  footer: {
+                    text: "To ask about another document, type 'change' or 'Change.'"
+                  },
+                  action: {
+                    button: 'Choose Document',
+                    sections: [
+                      {
+                        rows: userOptions
+                      }
+                    ]
+                  }
+                }
+              },
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+              }
+            })
+          } else {
+            const docId = await DocumentId.find({ userId: user._id, status: 'Success' }).sort({ updatedAt: -1 })
+            const answer = await this.askQuestionAboutDoc(
+              'explainer',
+              msg_body,
+              user._id,
+              docId[0].docId
+            )
+            axios({
+              method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                'https://graph.facebook.com/v12.0/' +
+                phone_number_id +
+                '/messages?access_token=' +
+                token,
+              data: {
+                messaging_product: 'whatsapp',
+                to: from,
+                text: { body: answer }
+              },
+              headers: { 'Content-Type': 'application/json' }
+            })
+          }
+        } else if (
+          body.entry[0].changes[0].value.messages[0].type == 'interactive'
+        ) {
+          const msg_reply = body.entry[0].changes[0].value.messages[0].interactive.list_reply.title
+          const relevantDoc = await Policy.findOne({ name: msg_reply })
+          let msgToBeSent = ''
+          const objectId = relevantDoc._id
+          if (userDocIds.includes(objectId.toString())) {
+            msgToBeSent =
+              'Please ask your question related to ' + msg_reply
           } else {
             msgToBeSent =
-              'Invalid Document Id Format'
-          }
-        } catch (error) {
-          docId = false
-        }
-        if (docId) {
-          const existingDocId = await DocumentId.findOne({ userId: user._id, docId: objectId })
-          if (!existingDocId) {
-            const docObj = {
-              docId: objectId,
-              userId: user._id,
-              answerFromWhatsApp: msgToBeSent,
-              status: 'Success'
-            }
-            const newDocIdentificationMsg = new DocumentId(docObj)
-            await newDocIdentificationMsg.save()
-          } else {
-            existingDocId.updatedAt = Date.now()
-            existingDocId.answerFromWhatsApp = msgToBeSent
-            await existingDocId.save()
+              'Invalid Document Id. Please upload your document and try again'
           }
           axios({
             method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
@@ -133,37 +202,21 @@ class PineconeChatbot {
             },
             headers: { 'Content-Type': 'application/json' }
           })
-        } else {
-          const docId = await DocumentId.find({ userId: user._id, status: 'Success' }).sort({ updatedAt: -1 })
-          const answer = await this.askQuestionAboutDoc('explainer', msg_body, user._id, docId[0].docId)
-          axios({
-            method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
-            url:
-                'https://graph.facebook.com/v12.0/' +
-                phone_number_id +
-                '/messages?access_token=' +
-                token,
-            data: {
-              messaging_product: 'whatsapp',
-              to: from,
-              text: { body: answer }
-            },
-            headers: { 'Content-Type': 'application/json' }
-          })
-          // axios({
-          //   method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-          //   url:
-          //     "https://graph.facebook.com/v12.0/" +
-          //     phone_number_id +
-          //     "/messages?access_token=" +
-          //     token,
-          //   data: {
-          //     messaging_product: "whatsapp",
-          //     to: from,
-          //     text: { body: "Not identifying Object Id" },
-          //   },
-          //   headers: { "Content-Type": "application/json" },
-          // });
+          const existingDocId = await DocumentId.findOne({ userId: user._id, docId: objectId })
+          if (!existingDocId) {
+            const docObj = {
+              docId: objectId,
+              userId: user._id,
+              answerFromWhatsApp: msgToBeSent,
+              status: 'Success'
+            }
+            const newDocIdentificationMsg = new DocumentId(docObj)
+            await newDocIdentificationMsg.save()
+          } else {
+            existingDocId.updatedAt = Date.now()
+            existingDocId.answerFromWhatsApp = msgToBeSent
+            await existingDocId.save()
+          }
         }
       }
       return 'Success'
