@@ -162,16 +162,15 @@ class PineconeChatbot {
             axios({
               method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
               url:
-                'https://graph.facebook.com/v12.0/' +
+                'https://graph.facebook.com/v18.0/' +
                 phone_number_id +
-                '/messages?access_token=' +
-                token,
+                '/messages',
               data: {
                 messaging_product: 'whatsapp',
                 to: from,
                 text: { body: answer }
               },
-              headers: { 'Content-Type': 'application/json' }
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
             })
           }
         } else if (
@@ -191,16 +190,15 @@ class PineconeChatbot {
           axios({
             method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
             url:
-              'https://graph.facebook.com/v12.0/' +
-              phone_number_id +
-              '/messages?access_token=' +
-              token,
+                'https://graph.facebook.com/v18.0/' +
+                phone_number_id +
+                '/messages',
             data: {
               messaging_product: 'whatsapp',
               to: from,
               text: { body: msgToBeSent }
             },
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
           })
           const existingDocId = await DocumentId.findOne({ userId: user._id, docId: objectId })
           if (!existingDocId) {
