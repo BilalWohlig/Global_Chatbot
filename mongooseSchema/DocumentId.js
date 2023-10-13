@@ -18,6 +18,9 @@ const schema = new Schema(
       type: 'String',
       enum: ['Success', 'Failure'],
       default: 'Failure'
+    },
+    updatedAtOld: {
+      type: Date
     }
   },
   { timestamps: true }

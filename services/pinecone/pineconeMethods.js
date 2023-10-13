@@ -16,10 +16,10 @@ const User = require("../../mongooseSchema/User.js");
 const Policy = require("../../mongooseSchema/Policies.js");
 const QnA = require("../../mongooseSchema/QnA.js");
 const DocumentId = require("../../mongooseSchema/DocumentId.js");
+const Support = require("../../mongooseSchema/SupportOptions.js");
+const FAQ = require("../../mongooseSchema/FrequentlyAskedQuestions.js");
 const axios = require("axios");
-const ObjectId = require("mongoose").Types.ObjectId;
-const fs = require("fs");
-const base64 = require("base-64");
+const moment = require("moment");
 
 class PineconeChatbot {
   async sleep(ms) {
@@ -103,22 +103,23 @@ class PineconeChatbot {
         });
         if (body.entry[0].changes[0].value.messages[0].type == "text") {
           const msg_body = body.entry[0].changes[0].value.messages[0].text.body;
-          if (
-            msg_body == "start" ||
-            msg_body == "Start" ||
-            msg_body == "change" ||
-            msg_body == "Change"
-          ) {
-            const allUserDocs = user.insuranceDocs;
-            const userOptions = [];
-            allUserDocs.forEach((doc) => {
+          const replySentiment = await this.replyClassification(msg_body);
+          const userReply = replySentiment.choices[0].message.content;
+          const docId = await DocumentId.find({
+            userId: user._id,
+            status: "Success",
+          }).sort({ updatedAt: -1 });
+          if (userReply == "Greeting") {
+            const supportOptions = await Support.find({ status: "Active" });
+            let userSupportOptions = [];
+            supportOptions.forEach((option) => {
               const obj = {
-                id: doc._id.toString(),
-                title: doc.name,
+                id: option._id,
+                title: option.name,
               };
-              userOptions.push(obj);
+              userSupportOptions.push(obj);
             });
-            axios({
+            await axios({
               method: "POST", // Required, HTTP method, a string, e.g. POST, GET
               url:
                 "https://graph.facebook.com/v18.0/" +
@@ -133,19 +134,19 @@ class PineconeChatbot {
                   type: "list",
                   header: {
                     type: "text",
-                    text: "Chatbot",
+                    text: "Emma",
                   },
                   body: {
-                    text: "Please specify which document you have a question about.",
+                    text: `Hello ${user.name}! My name is Emma, it's great to have you here. Please let me know what can I assist you with by choosing from the options below`,
                   },
-                  footer: {
-                    text: "To ask about another document, type 'change' or 'Change.'",
-                  },
+                  // footer: {
+                  //   text: "To ask about another document, type 'change' or 'Change.'",
+                  // },
                   action: {
-                    button: "Choose Document",
+                    button: "Options",
                     sections: [
                       {
-                        rows: userOptions,
+                        rows: userSupportOptions,
                       },
                     ],
                   },
@@ -156,18 +157,90 @@ class PineconeChatbot {
                 Authorization: `Bearer ${token}`,
               },
             });
-          } else {
-            const docId = await DocumentId.find({
-              userId: user._id,
-              status: "Success",
-            }).sort({ updatedAt: -1 });
+          }
+          else if(userReply == 'Appreciation' || userReply == 'Acknowledgement'){
+            let msg_to_be_sent = ''
+            if(userReply == 'Appreciation'){
+              msg_to_be_sent = "You're very welcome! 😊 We're delighted to assist. Please let me know what can I assist you with further by choosing from the options below"
+            }
+            else if(userReply == 'Acknowledgement'){
+              msg_to_be_sent = "Glad to help! 😊 Is there anything else you'd like to ask, or would you like to change your policy choice? Please choose from the below options. We're here to assist you further, so feel free to let us know!"
+            }
+            const userQuestionChoices = [
+              {
+                id: docId[0].docId,
+                title: 'Continue Asking'
+              },
+              {
+                id: docId[0]._id,
+                title: 'Change Policy'
+              }
+            ]
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: from,
+                type: "interactive",
+                interactive: {
+                  type: "list",
+                  header: {
+                    type: "text",
+                    text: "Emma",
+                  },
+                  body: {
+                    text: msg_to_be_sent,
+                  },
+                  // footer: {
+                  //   text: "To ask about another document, type 'change' or 'Change.'",
+                  // },
+                  action: {
+                    button: "Please Choose",
+                    sections: [
+                      {
+                        rows: userQuestionChoices,
+                      },
+                    ],
+                  },
+                },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          }
+          else if(userReply == 'Farewell'){
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                to: from,
+                text: { body: "Goodbye! 👋 If you ever wish to start a new conversation with me, just send a 'Hey' or a 'Hi' and I'll be right here to assist you. Have a great day!" },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          }
+          else {
             const answer = await this.askQuestionAboutDoc(
               "explainer",
               msg_body,
               user._id,
               docId[0].docId
             );
-            axios({
+            await axios({
               method: "POST", // Required, HTTP method, a string, e.g. POST, GET
               url:
                 "https://graph.facebook.com/v18.0/" +
@@ -183,55 +256,335 @@ class PineconeChatbot {
                 Authorization: `Bearer ${token}`,
               },
             });
+            const newTime = moment(docId[0].updatedAt)
+            const oldTime = moment(docId[0].updatedAtOld)
+            console.log(newTime.diff(oldTime, 'minutes', true))
+            if(newTime.diff(oldTime, 'minutes', true) > 5){
+              const userQuestionChoices = [
+                {
+                  id: docId[0].docId,
+                  title: 'Continue Questioning'
+                },
+                {
+                  id: docId[0]._id,
+                  title: 'Change Policy'
+                }
+              ]
+              await axios({
+                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                url:
+                  "https://graph.facebook.com/v18.0/" +
+                  phone_number_id +
+                  "/messages",
+                data: {
+                  messaging_product: "whatsapp",
+                  recipient_type: "individual",
+                  to: from,
+                  type: "interactive",
+                  interactive: {
+                    type: "list",
+                    header: {
+                      type: "text",
+                      text: "Emma",
+                    },
+                    body: {
+                      text: `Do you want to continue asking questions about the current policy, or would you like to change your policy choice? Feel free to let me know how I can assist you further.`,
+                    },
+                    // footer: {
+                    //   text: "To ask about another document, type 'change' or 'Change.'",
+                    // },
+                    action: {
+                      button: "Please Choose",
+                      sections: [
+                        {
+                          rows: userQuestionChoices,
+                        },
+                      ],
+                    },
+                  },
+                },
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+            }
+            else{
+              await axios({
+                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                url:
+                  "https://graph.facebook.com/v18.0/" +
+                  phone_number_id +
+                  "/messages",
+                data: {
+                  messaging_product: "whatsapp",
+                  recipient_type: "individual",
+                  to: from,
+                  type: "interactive",
+                  interactive: {
+                    type: "button",
+                    body: {
+                      text: "Feel free to continue asking questions by typing them out, or if you'd like to change your policy choice, simply click the button below.",
+                    },
+                    action: {
+                      buttons: [
+                        {
+                          type: 'reply',
+                          reply: {
+                            id: docId[0]._id,
+                            title: 'Change Policy Choice'
+                          }
+                        }
+                      ]
+                    },
+                  },
+                },
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+            }
           }
         } else if (
           body.entry[0].changes[0].value.messages[0].type == "interactive"
         ) {
-          const msg_reply =
-            body.entry[0].changes[0].value.messages[0].interactive.list_reply
-              .title;
-          const relevantDoc = await Policy.findOne({ name: msg_reply });
-          let msgToBeSent = "";
-          const objectId = relevantDoc._id;
-          if (userDocIds.includes(objectId.toString())) {
-            msgToBeSent = "Please ask your question related to " + msg_reply;
-          } else {
-            msgToBeSent =
-              "Invalid Document Id. Please upload your document and try again";
+          let msg_reply = ''
+          let msg_reply_id = ''
+          console.log()
+          if(body.entry[0].changes[0].value.messages[0].interactive.list_reply){
+            msg_reply =
+          body.entry[0].changes[0].value.messages[0].interactive.list_reply
+          .title;
+          msg_reply_id = body.entry[0].changes[0].value.messages[0].interactive.list_reply
+          .id
           }
-          axios({
-            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-            url:
+          let button_reply = ''
+          if(body.entry[0].changes[0].value.messages[0].interactive.button_reply){
+            button_reply = body.entry[0].changes[0].value.messages[0].interactive.button_reply
+          .title;
+          msg_reply_id = body.entry[0].changes[0].value.messages[0].interactive.button_reply
+          .id
+          }
+          const userPolicy = await Policy.findOne({ $or: [{name: msg_reply}, {_id: msg_reply_id}]  })
+          if (msg_reply == "Policy Questioning" || msg_reply == "Change Policy" || button_reply == "Change Policy Choice") {
+            const allUserDocs = user.insuranceDocs;
+            const userOptions = [];
+            allUserDocs.forEach((doc) => {
+              const obj = {
+                id: doc._id.toString(),
+                title: doc.name,
+              };
+              userOptions.push(obj);
+            });
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: from,
+                type: "interactive",
+                interactive: {
+                  type: "list",
+                  header: {
+                    type: "text",
+                    text: "Emma",
+                  },
+                  body: {
+                    text: "Let's get you the information you need. Please select the policy you have questions about. We're here to help you with any questions or concerns you may have related to our policies.",
+                  },
+                  // footer: {
+                  //   text: "To ask about another policy, type 'change' or 'Change'",
+                  // },
+                  action: {
+                    button: "Options",
+                    sections: [
+                      {
+                        rows: userOptions,
+                      },
+                    ],
+                  },
+                },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          }
+          else if(msg_reply == 'Other' || msg_reply == 'Continue Questioning'){
+            let msgToBeSent = "";
+            const objectId = msg_reply_id;
+            const policy = await Policy.findById(objectId);
+            if (userDocIds.includes(objectId.toString())) {
+            msgToBeSent = `Of Course! Please go ahead and ask any questions you may have about the policy ${policy.name}. We're here to provide you with all the information and assistance you need. Just type your question, and I'll be happy to help with any concerns or inquiries you have`;
+            } else {
+              msgToBeSent =
+                "Invalid Document Id. Please upload your document and try again";
+            }
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                to: from,
+                text: { body: msgToBeSent },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            let existingDocId = await DocumentId.findOne({
+              userId: user._id,
+              docId: objectId,
+            });
+            if (!existingDocId) {
+              const docObj = {
+                docId: objectId,
+                userId: user._id,
+                answerFromWhatsApp: msgToBeSent,
+                status: "Success",
+                updatedAtOld: Date.now(),
+              };
+              existingDocId = new DocumentId(docObj);
+              await existingDocId.save();
+            } else {
+              existingDocId.updatedAtOld = existingDocId.updatedAt
+              existingDocId.updatedAt = Date.now();
+              existingDocId.answerFromWhatsApp = msgToBeSent;
+              await existingDocId.save();
+            }
+          }
+          else if(msg_reply.includes('FAQ')){
+            const answerFromFAQ = await FAQ.findById(msg_reply_id)
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                to: from,
+                text: { body: answerFromFAQ.answer },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const userQuestionChoices = [
+              {
+                id: answerFromFAQ.policyId,
+                title: 'Continue Asking'
+              },
+              {
+                id: answerFromFAQ._id,
+                title: 'Change Policy'
+              }
+            ]
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
+                "https://graph.facebook.com/v18.0/" +
+                phone_number_id +
+                "/messages",
+              data: {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: from,
+                type: "interactive",
+                interactive: {
+                  type: "list",
+                  header: {
+                    type: "text",
+                    text: "Emma",
+                  },
+                  body: {
+                    text: `Do you want to continue asking questions about the current policy, or would you like to change your policy choice? Feel free to let me know how I can assist you further.`,
+                  },
+                  // footer: {
+                  //   text: "To ask about another document, type 'change' or 'Change.'",
+                  // },
+                  action: {
+                    button: "Please Choose",
+                    sections: [
+                      {
+                        rows: userQuestionChoices,
+                      },
+                    ],
+                  },
+                },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          }
+          else if(msg_reply == 'Continue Asking' || userPolicy){
+            // const policyId = userPolicy._id ? userPolicy._id : msg_reply_id
+            const faqs = await FAQ.find({status: 'Active', policyId: userPolicy._id})
+            let faqQuestions = []
+            faqs.forEach((faq, i) => {
+              const obj = {
+                id: faq._id,
+                title: `FAQ ${i+1}`,
+                description: faq.question
+              }
+              faqQuestions.push(obj);
+            })
+            const otherObj = {
+              id: userPolicy._id,
+              title: 'Other'
+            }
+            faqQuestions.push(otherObj)
+            await axios({
+              method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+              url:
               "https://graph.facebook.com/v18.0/" +
               phone_number_id +
               "/messages",
-            data: {
-              messaging_product: "whatsapp",
-              to: from,
-              text: { body: msgToBeSent },
-            },
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const existingDocId = await DocumentId.findOne({
-            userId: user._id,
-            docId: objectId,
-          });
-          if (!existingDocId) {
-            const docObj = {
-              docId: objectId,
-              userId: user._id,
-              answerFromWhatsApp: msgToBeSent,
-              status: "Success",
-            };
-            const newDocIdentificationMsg = new DocumentId(docObj);
-            await newDocIdentificationMsg.save();
-          } else {
-            existingDocId.updatedAt = Date.now();
-            existingDocId.answerFromWhatsApp = msgToBeSent;
-            await existingDocId.save();
+              data: {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: from,
+                type: "interactive",
+                interactive: {
+                  type: "list",
+                  header: {
+                    type: "text",
+                    text: "Emma",
+                  },
+                  body: {
+                    text: `Great! Now, to make things even smoother, I'd recommend checking our Frequently Asked Questions (FAQs) about the ${userPolicy.name} for quick answers. If you still have a question or need more clarification, you can select 'Other' and ask your specific question. I'm here to assist you with any inquiries you have. Just let me know how I can help!`,
+                  },
+                  // footer: {
+                  //   text: "To ask about another policy, type 'change' or 'Change'",
+                  // },
+                  action: {
+                    button: "FAQ",
+                    sections: [
+                      {
+                        rows: faqQuestions
+                      },
+                    ],
+                  },
+                },
+              },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
           }
         }
       }
@@ -405,6 +758,28 @@ class PineconeChatbot {
           role: "user",
           content: `Context: ${context}
                       Question: ${question}`,
+        },
+        {
+          role: "assistant",
+          content: "Answer: ",
+        },
+      ],
+    });
+    return response.data;
+  }
+  
+  async replyClassification(reply) {
+    const response = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a sentiment classifier. Analyze the text given and classify it accordingly. The classification choices available to you are [Greeting, Question/Statement, Appreciation, Acknowledgement, Farewell]",
+        },
+        {
+          role: "user",
+          content: `Text: ${reply}`,
         },
         {
           role: "assistant",
