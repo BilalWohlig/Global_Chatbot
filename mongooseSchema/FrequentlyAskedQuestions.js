@@ -1,24 +1,24 @@
-const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
 
 const schema = new Schema(
   {
     question: {
-      type: String,
+      type: String
     },
     answer: {
-      type: String,
+      type: String
     },
     policyId: {
       type: Schema.Types.ObjectId,
-      ref: "Policies",
+      ref: 'Policies'
     },
     status: {
-        type: String,
-        enum: ['Active', 'Inactive'],
-        default: "Active"
+      type: String,
+      enum: ['Active', 'Inactive'],
+      default: 'Active'
     }
   },
   { timestamps: true }
-);
-module.exports = mongoose.model("FrequentlyAskedQuestions", schema);
+)
+module.exports = mongoose.model('FrequentlyAskedQuestions', schema)

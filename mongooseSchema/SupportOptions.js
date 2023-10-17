@@ -10,7 +10,7 @@ const schema = new Schema(
       type: String,
       enum: ['Active', 'Inactive'],
       default: 'Active'
-    },
+    }
   },
   { timestamps: true }
 )
