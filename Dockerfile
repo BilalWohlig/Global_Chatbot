@@ -12,7 +12,7 @@ ADD . /app
 
 RUN mkdir -p /var/log/node_apps/
 
-EXPOSE 7001
+EXPOSE 3000
 
 # RUN ./node_modules/.bin/jsdoc -c ./jsdoc.conf -d public/js-docs
 
