@@ -128,6 +128,7 @@ class PineconeChatbot {
         }
         if (userMessage == 'Greeting' || (lastUserGreetingDate == '' || lastUserEndConvoDate == '') || (lastUserGreetingDate > lastUserEndConvoDate)) {
           if (body.entry[0].changes[0].value.messages[0].type == 'text') {
+            console.log("In Text")
             const msg_body = body.entry[0].changes[0].value.messages[0].text.body
             const replySentiment = await this.replyClassification(msg_body)
             const userReply = replySentiment.choices[0].message.content
@@ -135,6 +136,7 @@ class PineconeChatbot {
               userId: user._id,
               status: 'Success'
             }).sort({ updatedAt: -1 })
+            console.log(userReply)
             if (userReply == 'Greeting') {
               const existingGreeting = await Greeting.findOne({ userId: user._id })
               if (!existingGreeting) {
@@ -202,6 +204,7 @@ class PineconeChatbot {
                 }
                 userOptions.push(obj)
               })
+              console.log("*************",userOptions)
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
