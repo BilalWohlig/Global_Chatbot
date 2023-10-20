@@ -237,8 +237,7 @@ class PineconeChatbot {
                   Authorization: `Bearer ${token}`
                 }
               })
-            }
-            else if (userReply == 'Question') {
+            } else if (userReply == 'Question') {
               const answer = await this.askQuestionAboutDoc(
                 'explainer',
                 msg_body,
@@ -302,8 +301,7 @@ class PineconeChatbot {
                   Authorization: `Bearer ${token}`
                 }
               })
-            } 
-            else {
+            } else {
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -642,52 +640,52 @@ class PineconeChatbot {
                 status: 'Active',
                 policyId: userPolicy._id
               })
-              let faqQuestions = []
+              const faqQuestions = []
               faqs.forEach((faq, i) => {
                 const obj = {
                   id: faq._id,
-                  title: `FAQ ${i+1}`,
+                  title: `FAQ ${i + 1}`,
                   description: faq.question
                 }
-                faqQuestions.push(obj);
+                faqQuestions.push(obj)
               })
               console.log(faqQuestions)
               console.log(userPolicy)
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                "https://graph.facebook.com/v18.0/" +
+                'https://graph.facebook.com/v18.0/' +
                 phone_number_id +
-                "/messages",
+                '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: "Priya",
+                      type: 'text',
+                      text: 'Priya'
                     },
                     body: {
-                      text: `Great! Here are some of the most frequently asked questions (FAQs) of your ${userPolicy.name} to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`,
+                      text: `Great! Here are some of the most frequently asked questions (FAQs) of your ${userPolicy.name} to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`
                     },
                     action: {
-                      button: "FAQ",
+                      button: 'FAQ',
                       sections: [
                         {
                           rows: faqQuestions
-                        },
-                      ],
-                    },
-                  },
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               // await axios({
               //   method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
               //   url:

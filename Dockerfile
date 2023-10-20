@@ -6,7 +6,7 @@ WORKDIR /app
 
 RUN apk add git
 
-RUN npm install --production
+RUN npm install
 
 ADD . /app
 
