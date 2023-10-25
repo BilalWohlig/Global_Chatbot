@@ -66,7 +66,9 @@
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.1",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^3.11.174",
     "redis": "^3.0.2",
+    "translate": "^2.0.2",
     "uuid": "^9.0.1"
   }
 }

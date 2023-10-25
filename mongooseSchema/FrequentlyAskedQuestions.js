@@ -6,7 +6,13 @@ const schema = new Schema(
     question: {
       type: String
     },
+    questionHindi: {
+      type: String
+    },
     answer: {
+      type: String
+    },
+    answerHindi: {
       type: String
     },
     policyId: {

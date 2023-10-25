@@ -13,6 +13,9 @@ const schema = new Schema(
     },
     name: {
       type: String
+    },
+    Hindi: {
+      type: String
     }
   },
   { timestamps: true }

@@ -21,6 +21,10 @@ const schema = new Schema(
         ref: 'Policies'
       }
     ],
+    language: {
+      type: Schema.Types.ObjectId,
+      ref: 'Language'
+    },
     status: {
       type: String,
       enum: ['Enabled', 'Disabled'],
