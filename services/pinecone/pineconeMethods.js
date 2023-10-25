@@ -1,91 +1,91 @@
-const { Pinecone } = require("@pinecone-database/pinecone");
+const { Pinecone } = require('@pinecone-database/pinecone')
 const pinecone = new Pinecone({
   environment: process.env.PINECONE_ENVIRONMENT,
-  apiKey: process.env.PINECONE_API_KEY,
-});
-const { Configuration, OpenAIApi } = require("openai");
+  apiKey: process.env.PINECONE_API_KEY
+})
+const { Configuration, OpenAIApi } = require('openai')
 const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
-const pdfParse = require("pdf-parse");
-const authentication = require("../../middlewares/auth/authentication");
-const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter");
-const { Document } = require("langchain/document");
-const User = require("../../mongooseSchema/User.js");
-const Policy = require("../../mongooseSchema/Policies.js");
-const QnA = require("../../mongooseSchema/QnA.js");
-const DocumentId = require("../../mongooseSchema/DocumentId.js");
-const Support = require("../../mongooseSchema/SupportOptions.js");
-const HelpfulLogs = require("../../mongooseSchema/HelpfulLogs.js");
-const FAQ = require("../../mongooseSchema/FrequentlyAskedQuestions.js");
-const Greeting = require("../../mongooseSchema/Greeting.js");
-const Language = require("../../mongooseSchema/Language.js");
-const GeneralReplies = require("../../mongooseSchema/GeneralReplies.js");
-const axios = require("axios");
-const moment = require("moment");
-const pdfjsLib = require("pdfjs-dist");
+  apiKey: process.env.OPENAI_API_KEY
+})
+const openai = new OpenAIApi(configuration)
+const pdfParse = require('pdf-parse')
+const authentication = require('../../middlewares/auth/authentication')
+const { RecursiveCharacterTextSplitter } = require('langchain/text_splitter')
+const { Document } = require('langchain/document')
+const User = require('../../mongooseSchema/User.js')
+const Policy = require('../../mongooseSchema/Policies.js')
+const QnA = require('../../mongooseSchema/QnA.js')
+const DocumentId = require('../../mongooseSchema/DocumentId.js')
+const Support = require('../../mongooseSchema/SupportOptions.js')
+const HelpfulLogs = require('../../mongooseSchema/HelpfulLogs.js')
+const FAQ = require('../../mongooseSchema/FrequentlyAskedQuestions.js')
+const Greeting = require('../../mongooseSchema/Greeting.js')
+const Language = require('../../mongooseSchema/Language.js')
+const GeneralReplies = require('../../mongooseSchema/GeneralReplies.js')
+const axios = require('axios')
+const moment = require('moment')
+const pdfjsLib = require('pdfjs-dist')
 
 class PineconeChatbot {
-  async sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  async sleep (ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
-  async createUser(body) {
-    const existingUser = await User.findOne({ email: body.email });
+  async createUser (body) {
+    const existingUser = await User.findOne({ email: body.email })
     if (existingUser) {
       const userObj = {
         name: existingUser.name,
         mobile: existingUser.mobile,
         email: existingUser.email,
-        id: existingUser._id,
-      };
-      const token = authentication.setToken(userObj, 86400);
+        id: existingUser._id
+      }
+      const token = authentication.setToken(userObj, 86400)
       return {
         user: existingUser,
-        token: token,
-      };
+        token: token
+      }
     }
     const userObj = {
       name: body.name,
       mobile: body.mobile,
-      email: body.email,
-    };
-    const newUser = new User(userObj);
-    await newUser.save();
-    userObj.id = newUser._id;
-    const token = authentication.setToken(userObj, 86400);
+      email: body.email
+    }
+    const newUser = new User(userObj)
+    await newUser.save()
+    userObj.id = newUser._id
+    const token = authentication.setToken(userObj, 86400)
     return {
       user: newUser,
-      token: token,
-    };
+      token: token
+    }
   }
 
-  async deleteAllVectorsFromNamespace(indexName) {
-    const index = pinecone.Index(indexName);
-    await index.deleteAll();
-    return "Deleted";
+  async deleteAllVectorsFromNamespace (indexName) {
+    const index = pinecone.Index(indexName)
+    await index.deleteAll()
+    return 'Deleted'
   }
 
-  async deleteSpecificVectorsFromNamespace(indexName, policyId) {
-    const index = pinecone.Index(indexName);
+  async deleteSpecificVectorsFromNamespace (indexName, policyId) {
+    const index = pinecone.Index(indexName)
     await index.delete({
       deleteRequest: {
         filter: {
-          policyId: { $eq: policyId },
-        },
-      },
-    });
-    return "Deleted";
+          policyId: { $eq: policyId }
+        }
+      }
+    })
+    return 'Deleted'
   }
 
-  async receiveUserMessage(requestBody) {
-    const token = process.env.TOKEN;
+  async receiveUserMessage (requestBody) {
+    const token = process.env.TOKEN
     // Parse the request body from the POST
-    const body = requestBody;
+    const body = requestBody
 
     // Check the Incoming webhook message
-    console.log(JSON.stringify(body, null, 2));
+    console.log(JSON.stringify(body, null, 2))
 
     // info on WhatsApp text message payload: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#text-messages
     if (requestBody.object) {
@@ -97,82 +97,82 @@ class PineconeChatbot {
         body.entry[0].changes[0].value.messages[0]
       ) {
         const phone_number_id =
-          body.entry[0].changes[0].value.metadata.phone_number_id;
-        const from = body.entry[0].changes[0].value.messages[0].from; // extract the phone number from the webhook payload
-        const userWhatsappId = body.entry[0].changes[0].value.contacts[0].wa_id;
+          body.entry[0].changes[0].value.metadata.phone_number_id
+        const from = body.entry[0].changes[0].value.messages[0].from // extract the phone number from the webhook payload
+        const userWhatsappId = body.entry[0].changes[0].value.contacts[0].wa_id
         const user = await User.findOne({ mobile: userWhatsappId })
-          .populate("insuranceDocs")
-          .populate("language");
+          .populate('insuranceDocs')
+          .populate('language')
         const userDocIds = user.insuranceDocs.map((userDoc) => {
-          return userDoc._id.toString();
-        });
-        const userLanguage = user.language.name;
-        const lastUserGreeting = await Greeting.findOne({ userId: user._id });
+          return userDoc._id.toString()
+        })
+        const userLanguage = user.language.name
+        const lastUserGreeting = await Greeting.findOne({ userId: user._id })
         const lastUserEndConvo = await HelpfulLogs.findOne({
-          userId: user._id,
-        }).sort({ _id: -1 });
-        let lastUserGreetingDate = "";
-        let lastUserEndConvoDate = "";
+          userId: user._id
+        }).sort({ _id: -1 })
+        let lastUserGreetingDate = ''
+        let lastUserEndConvoDate = ''
         if (lastUserGreeting) {
-          lastUserGreetingDate = moment(lastUserGreeting.updatedAt);
+          lastUserGreetingDate = moment(lastUserGreeting.updatedAt)
         }
         if (lastUserEndConvo) {
-          lastUserEndConvoDate = moment(lastUserEndConvo.createdAt);
+          lastUserEndConvoDate = moment(lastUserEndConvo.createdAt)
         }
-        let userMessage = "";
-        let message_text = "";
-        if (body.entry[0].changes[0].value.messages[0].type == "text") {
-          message_text = body.entry[0].changes[0].value.messages[0].text.body;
-          const replySentiment = await this.replyClassification(message_text);
-          userMessage = replySentiment.choices[0].message.content;
+        let userMessage = ''
+        let message_text = ''
+        if (body.entry[0].changes[0].value.messages[0].type == 'text') {
+          message_text = body.entry[0].changes[0].value.messages[0].text.body
+          const replySentiment = await this.replyClassification(message_text)
+          userMessage = replySentiment.choices[0].message.content
         } else if (
-          body.entry[0].changes[0].value.messages[0].type == "interactive"
+          body.entry[0].changes[0].value.messages[0].type == 'interactive'
         ) {
           if (
             body.entry[0].changes[0].value.messages[0].interactive.list_reply
           ) {
             userMessage =
               body.entry[0].changes[0].value.messages[0].interactive.list_reply
-                .title;
+                .title
           } else if (
             body.entry[0].changes[0].value.messages[0].interactive.button_reply
           ) {
             userMessage =
               body.entry[0].changes[0].value.messages[0].interactive
-                .button_reply.title;
+                .button_reply.title
           }
         }
         if (
-          userMessage == "Greeting" ||
-          lastUserGreetingDate == "" ||
-          lastUserEndConvoDate == "" ||
+          userMessage == 'Greeting' ||
+          lastUserGreetingDate == '' ||
+          lastUserEndConvoDate == '' ||
           lastUserGreetingDate > lastUserEndConvoDate
         ) {
-          if (body.entry[0].changes[0].value.messages[0].type == "text") {
+          if (body.entry[0].changes[0].value.messages[0].type == 'text') {
             const msg_body =
-              body.entry[0].changes[0].value.messages[0].text.body;
-            const replySentiment = await this.replyClassification(msg_body);
-            const userReply = replySentiment.choices[0].message.content;
+              body.entry[0].changes[0].value.messages[0].text.body
+            const replySentiment = await this.replyClassification(msg_body)
+            const userReply = replySentiment.choices[0].message.content
             const docId = await DocumentId.find({
               userId: user._id,
-              status: "Success",
-            }).sort({ updatedAt: -1 });
-            console.log(userReply);
-            if (userReply == "Greeting") {
+              status: 'Success'
+            }).sort({ updatedAt: -1 })
+            console.log(userReply)
+            if (userReply == 'Greeting') {
               const existingGreeting = await Greeting.findOne({
-                userId: user._id,
-              });
+                userId: user._id
+              })
               if (!existingGreeting) {
                 const greetingObj = {
                   userId: user._id,
-                  message: msg_body,
-                };
-                const newGreeting = new Greeting(greetingObj);
-                await newGreeting.save();
+                  message: msg_body
+                }
+                const newGreeting = new Greeting(greetingObj)
+                await newGreeting.save()
               } else {
-                existingGreeting.updatedAt = Date.now();
-                existingGreeting.message = msg_body;
-                await existingGreeting.save();
+                existingGreeting.updatedAt = Date.now()
+                existingGreeting.message = msg_body
+                await existingGreeting.save()
               }
               // const supportOptions = await Support.find({ status: 'Active' })
               // const userSupportOptions = []
@@ -267,225 +267,225 @@ class PineconeChatbot {
               //   },
               // });
 
-              const allLanguages = await Language.find({ status: "enabled" });
-              const languageOptions = [];
+              const allLanguages = await Language.find({ status: 'enabled' })
+              const languageOptions = []
               allLanguages.forEach((language) => {
                 const obj = {
                   id: language._id,
-                  title: language.name,
-                };
-                languageOptions.push(obj);
-              });
+                  title: language.name
+                }
+                languageOptions.push(obj)
+              })
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: "Priya",
+                      type: 'text',
+                      text: 'Priya'
                     },
                     body: {
-                      text: `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know which language would you prefer for our conversation`,
+                      text: `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know which language would you prefer for our conversation`
                     },
                     action: {
-                      button: "Languages",
+                      button: 'Languages',
                       sections: [
                         {
-                          rows: languageOptions,
-                        },
-                      ],
-                    },
-                  },
+                          rows: languageOptions
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            } else if (userReply == "Question") {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
+            } else if (userReply == 'Question') {
               const answer = await this.askQuestionAboutDoc(
-                "explainer",
+                'explainer',
                 msg_body,
                 user._id,
                 docId[0].docId,
                 userLanguage
-              );
+              )
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
-                  text: { body: answer },
+                  text: { body: answer }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               let actualReply = 'To change your policy choice, click the first button. To end the conversation, click the second button.'
-              let buttonOptions = [
+              const buttonOptions = [
                 {
-                  type: "reply",
+                  type: 'reply',
                   reply: {
                     id: docId[0]._id,
-                    title: "Change Policy",
-                  },
+                    title: 'Change Policy'
+                  }
                 },
                 {
-                  type: "reply",
+                  type: 'reply',
                   reply: {
                     id: user._id,
-                    title: "End Conversation",
-                  },
-                },
+                    title: 'End Conversation'
+                  }
+                }
               ]
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
-              if(userLanguage!='English'){
+              if (userLanguage != 'English') {
                 for (let i = 0; i < buttonOptions.length; i++) {
-                  const element = buttonOptions[i];
-                  const reply = await GeneralReplies.findOne({status: 'enabled', textEnglish: element.reply.title, language: user.language._id})
+                  const element = buttonOptions[i]
+                  const reply = await GeneralReplies.findOne({ status: 'enabled', textEnglish: element.reply.title, language: user.language._id })
                   buttonOptions[i].reply.title = reply.text
                 }
               }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "button",
+                    type: 'button',
                     body: {
-                      text: actualReply,
+                      text: actualReply
                     },
                     action: {
                       buttons: buttonOptions
-                    },
-                  },
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
             } else {
               let actualReply = 'Sorry, it seems like there was an issue. Please follow the instructions for a smoother experience.'
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
                   text: {
-                    body: actualReply,
-                  },
+                    body: actualReply
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
             }
           } else if (
-            body.entry[0].changes[0].value.messages[0].type == "interactive"
+            body.entry[0].changes[0].value.messages[0].type == 'interactive'
           ) {
-            let msg_reply = "";
-            let msg_reply_id = "";
+            let msg_reply = ''
+            let msg_reply_id = ''
             if (
               body.entry[0].changes[0].value.messages[0].interactive.list_reply
             ) {
               msg_reply =
                 body.entry[0].changes[0].value.messages[0].interactive
-                  .list_reply.title;
+                  .list_reply.title
               msg_reply_id =
                 body.entry[0].changes[0].value.messages[0].interactive
-                  .list_reply.id;
+                  .list_reply.id
             }
-            let button_reply = "";
+            let button_reply = ''
             if (
               body.entry[0].changes[0].value.messages[0].interactive
                 .button_reply
             ) {
               button_reply =
                 body.entry[0].changes[0].value.messages[0].interactive
-                  .button_reply.title;
+                  .button_reply.title
               msg_reply_id =
                 body.entry[0].changes[0].value.messages[0].interactive
-                  .button_reply.id;
+                  .button_reply.id
             }
             const userPolicy = await Policy.findOne({
-              $or: [{ name: msg_reply }, { _id: msg_reply_id }],
-            });
-            const allLanguages = await Language.find({ status: "enabled" });
+              $or: [{ name: msg_reply }, { _id: msg_reply_id }]
+            })
+            const allLanguages = await Language.find({ status: 'enabled' })
             const languageNames = allLanguages.map((language) => {
-              return language.name;
-            });
+              return language.name
+            })
             const generalReply = await GeneralReplies.findOne({
-              status: "enabled",
-              $or: [{ text: msg_reply }, { text: button_reply }],
-            });
+              status: 'enabled',
+              $or: [{ text: msg_reply }, { text: button_reply }]
+            })
             if (
-              (generalReply && generalReply.textEnglish == "Change Policy") ||
-              msg_reply == "Change Policy" || button_reply == "Change Policy"
+              (generalReply && generalReply.textEnglish == 'Change Policy') ||
+              msg_reply == 'Change Policy' || button_reply == 'Change Policy'
             ) {
               let actualReply =
-                "Let's get you the information you need. Please select the policy you have questions about. We're here to help you with any questions or concerns you may have related to our policies.";
-              let actualBot = "Priya";
-              let actualButton = "Options";
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+                "Let's get you the information you need. Please select the policy you have questions about. We're here to help you with any questions or concerns you may have related to our policies."
+              let actualBot = 'Priya'
+              let actualButton = 'Options'
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
                 actualBot = realReply.bot,
                 actualButton = realReply.button
               }
-              const allUserDocs = user.insuranceDocs;
-              let userOptions = [];
+              const allUserDocs = user.insuranceDocs
+              let userOptions = []
               allUserDocs.forEach((doc) => {
                 const obj = {
                   id: doc._id.toString(),
-                  title: doc.name,
-                };
-                userOptions.push(obj);
-              });
+                  title: doc.name
+                }
+                userOptions.push(obj)
+              })
               // const optionNames = userOptions.map((option) => {
               //   return option.title;
               // });
-              if (userLanguage != "English") {
+              if (userLanguage != 'English') {
                 userOptions = []
                 allUserDocs.forEach((doc) => {
                   const obj = {
                     id: doc._id.toString(),
-                    title: doc[userLanguage],
-                  };
-                  userOptions.push(obj);
+                    title: doc[userLanguage]
+                  }
+                  userOptions.push(obj)
                 })
                 // let textData = await this.languageTranslator(
                 //   userLanguage,
@@ -534,73 +534,73 @@ class PineconeChatbot {
                 // }
               }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: actualBot,
+                      type: 'text',
+                      text: actualBot
                     },
                     body: {
-                      text: actualReply,
+                      text: actualReply
                     },
                     action: {
                       button: actualButton,
                       sections: [
                         {
-                          rows: userOptions,
-                        },
-                      ],
-                    },
-                  },
+                          rows: userOptions
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
             } else if (languageNames.includes(msg_reply)) {
-              user.language = msg_reply_id;
-              await user.save();
-              const allUserDocs = user.insuranceDocs;
-              let userOptions = [];
+              user.language = msg_reply_id
+              await user.save()
+              const allUserDocs = user.insuranceDocs
+              let userOptions = []
               allUserDocs.forEach((doc) => {
                 const obj = {
                   id: doc._id.toString(),
-                  title: doc.name,
-                };
-                userOptions.push(obj);
-              });
+                  title: doc.name
+                }
+                userOptions.push(obj)
+              })
               // const optionNames = userOptions.map((option) => {
               //   return option.title;
               // });
               // let actualReply = `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know which policy do you have questions about. I'm here to help you with any questions or concerns you may have related to our policies.`;
-              let actualReply = `Great! Please let me know which policy do you have questions about. I'm here to help you with any questions or concerns you may have related to our policies.`;
-              let actualBot = "Priya";
-              let actualButton = "Options";
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              let actualReply = 'Great! Please let me know which policy do you have questions about. I\'m here to help you with any questions or concerns you may have related to our policies.'
+              let actualBot = 'Priya'
+              let actualButton = 'Options'
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
                 actualBot = realReply.bot,
                 actualButton = realReply.button
               }
-              if (msg_reply != "English") {
+              if (msg_reply != 'English') {
                 userOptions = []
                 allUserDocs.forEach((doc) => {
                   const obj = {
                     id: doc._id.toString(),
-                    title: doc[userLanguage],
-                  };
-                  userOptions.push(obj);
+                    title: doc[userLanguage]
+                  }
+                  userOptions.push(obj)
                 })
                 // let textData = await this.languageTranslator(
                 //   msg_reply,
@@ -649,56 +649,56 @@ class PineconeChatbot {
                 // }
               }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: actualBot,
+                      type: 'text',
+                      text: actualBot
                     },
                     body: {
-                      text: actualReply,
+                      text: actualReply
                     },
                     action: {
                       button: actualButton,
                       sections: [
                         {
-                          rows: userOptions,
-                        },
-                      ],
-                    },
-                  },
+                          rows: userOptions
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
             } else if (
               (generalReply &&
-              generalReply.textEnglish == "Continue Asking") || msg_reply == "Continue Asking"
+              generalReply.textEnglish == 'Continue Asking') || msg_reply == 'Continue Asking'
             ) {
-              let actualReply = "";
-              const objectId = msg_reply_id;
-              const policy = await Policy.findById(objectId);
+              let actualReply = ''
+              const objectId = msg_reply_id
+              const policy = await Policy.findById(objectId)
               if (userDocIds.includes(objectId.toString())) {
                 // actualReply = `Of Course! Please go ahead and ask any questions you may have about your ${policy.name}. We're here to provide you with all the information and assistance you need. Just type your question, and I'll be happy to help with any concerns or inquiries you have`;
-                actualReply = `Of Course! Please go ahead and ask any questions you may have about your policy. We're here to provide you with all the information and assistance you need. Just type your question, and I'll be happy to help with any concerns or inquiries you have`;
+                actualReply = 'Of Course! Please go ahead and ask any questions you may have about your policy. We\'re here to provide you with all the information and assistance you need. Just type your question, and I\'ll be happy to help with any concerns or inquiries you have'
               } else {
                 actualReply =
-                  "Invalid Document Id. Please upload your document and try again";
+                  'Invalid Document Id. Please upload your document and try again'
               }
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
               // if (userLanguage != "English") {
@@ -720,74 +720,74 @@ class PineconeChatbot {
               //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
               // }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
-                  text: { body: actualReply },
+                  text: { body: actualReply }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               let existingDocId = await DocumentId.findOne({
                 userId: user._id,
-                docId: objectId,
-              });
+                docId: objectId
+              })
               if (!existingDocId) {
                 const docObj = {
                   docId: objectId,
                   userId: user._id,
-                  status: "Success",
-                };
-                existingDocId = new DocumentId(docObj);
-                await existingDocId.save();
+                  status: 'Success'
+                }
+                existingDocId = new DocumentId(docObj)
+                await existingDocId.save()
               } else {
-                existingDocId.updatedAt = Date.now();
-                await existingDocId.save();
+                existingDocId.updatedAt = Date.now()
+                await existingDocId.save()
               }
-            } else if (msg_reply.includes("FAQ")) {
-              const answerFromFAQ = await FAQ.findById(msg_reply_id);
-              let actualReply = answerFromFAQ.answer;
+            } else if (msg_reply.includes('FAQ')) {
+              const answerFromFAQ = await FAQ.findById(msg_reply_id)
+              let actualReply = answerFromFAQ.answer
               let actualFurther =
-                "Would you like to continue asking questions about the current policy, change your policy choice or end this conversation? Feel free to let me know how I can assist you further.";
-              let actualBot = "Priya";
-              let actualButton = "Please Choose";
-              let userQuestionChoices = [
+                'Would you like to continue asking questions about the current policy, change your policy choice or end this conversation? Feel free to let me know how I can assist you further.'
+              let actualBot = 'Priya'
+              let actualButton = 'Please Choose'
+              const userQuestionChoices = [
                 {
                   id: answerFromFAQ.policyId,
-                  title: "Continue Asking",
+                  title: 'Continue Asking'
                 },
                 {
                   id: answerFromFAQ._id,
-                  title: "Change Policy",
+                  title: 'Change Policy'
                 },
                 {
                   id: user._id,
-                  title: "End Conversation",
-                },
-              ];
+                  title: 'End Conversation'
+                }
+              ]
               // const userChoicesNames = userQuestionChoices.map((choice) => {
               //   return choice.title;
               // });
-              const realReply = await GeneralReplies.findOne({textEnglish: actualFurther, language: user.language._id})
-              if(realReply){
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualFurther, language: user.language._id })
+              if (realReply) {
                 actualFurther = realReply.text
                 actualBot = realReply.bot,
                 actualButton = realReply.button
               }
-              if (userLanguage != "English") {
+              if (userLanguage != 'English') {
                 const fieldName = `answer${userLanguage}`
                 actualReply = answerFromFAQ[fieldName]
 
                 for (let i = 0; i < userQuestionChoices.length; i++) {
-                  const element = userQuestionChoices[i];
-                  const reply = await GeneralReplies.findOne({status: 'enabled', textEnglish: element.title, language: user.language._id})
+                  const element = userQuestionChoices[i]
+                  const reply = await GeneralReplies.findOne({ status: 'enabled', textEnglish: element.title, language: user.language._id })
                   userQuestionChoices[i].title = reply.text
                 }
                 // let textData = await this.languageTranslator(
@@ -843,88 +843,88 @@ class PineconeChatbot {
                 // }
               }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
-                  text: { body: actualReply },
+                  text: { body: actualReply }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: actualBot,
+                      type: 'text',
+                      text: actualBot
                     },
                     body: {
-                      text: actualFurther,
+                      text: actualFurther
                     },
                     action: {
                       button: actualButton,
                       sections: [
                         {
-                          rows: userQuestionChoices,
-                        },
-                      ],
-                    },
-                  },
+                          rows: userQuestionChoices
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
             } else if (
               (generalReply &&
-              generalReply.textEnglish == "End Conversation") || msg_reply == "End Conversation" || button_reply == "End Conversation"
+              generalReply.textEnglish == 'End Conversation') || msg_reply == 'End Conversation' || button_reply == 'End Conversation'
             ) {
-              let actualReply = "Was this information helpful to you";
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              let actualReply = 'Was this information helpful to you'
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
-              let buttonOptions = [
+              const buttonOptions = [
                 {
-                  type: "reply",
+                  type: 'reply',
                   reply: {
                     id: user._id,
-                    title: "Yes",
-                  },
+                    title: 'Yes'
+                  }
                 },
                 {
-                  type: "reply",
+                  type: 'reply',
                   reply: {
                     id: user.insuranceDocs[0]._id,
-                    title: "No",
-                  },
-                },
-              ];
+                    title: 'No'
+                  }
+                }
+              ]
               // const buttonNames = buttonOptions.map((button) => {
               //   return button.reply.title;
               // });
-              if (userLanguage != "English") {
+              if (userLanguage != 'English') {
                 for (let i = 0; i < buttonOptions.length; i++) {
-                  const element = buttonOptions[i];
-                  const reply = await GeneralReplies.findOne({status: 'enabled', textEnglish: element.reply.title, language: user.language._id})
+                  const element = buttonOptions[i]
+                  const reply = await GeneralReplies.findOne({ status: 'enabled', textEnglish: element.reply.title, language: user.language._id })
                   buttonOptions[i].reply.title = reply.text
                 }
                 // let textData = await this.languageTranslator(
@@ -964,44 +964,44 @@ class PineconeChatbot {
               }
               // console.log(buttonOptions);
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "button",
+                    type: 'button',
                     body: {
-                      text: actualReply,
+                      text: actualReply
                     },
                     action: {
-                      buttons: buttonOptions,
-                    },
-                  },
+                      buttons: buttonOptions
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            } else if ((generalReply && generalReply.textEnglish == "Yes") || button_reply == "Yes") {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
+            } else if ((generalReply && generalReply.textEnglish == 'Yes') || button_reply == 'Yes') {
               // let actualReply = `Goodbye ${user.name}! 👋 We're delighted that we could assist you. If you ever wish to start a new conversation with me, just send a 'Hey' or a 'Hi' and I'll be right here to assist you. Have a great day!`;
-              let actualReply = `Goodbye! 👋 We're delighted that we could assist you. If you ever wish to start a new conversation with me, just send a 'Hey' or a 'Hi' and I'll be right here to assist you. Have a great day!`;
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+              let actualReply = 'Goodbye! 👋 We\'re delighted that we could assist you. If you ever wish to start a new conversation with me, just send a \'Hey\' or a \'Hi\' and I\'ll be right here to assist you. Have a great day!'
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
               const logsObj = {
                 userId: user._id,
-                userReply: "Yes",
-              };
-              const logs = new HelpfulLogs(logsObj);
-              await logs.save();
+                userReply: 'Yes'
+              }
+              const logs = new HelpfulLogs(logsObj)
+              await logs.save()
               // if (userLanguage != "English") {
               //   let textData = await this.languageTranslator(
               //     userLanguage,
@@ -1021,35 +1021,35 @@ class PineconeChatbot {
               //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
               // }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
-                  text: { body: actualReply },
+                  text: { body: actualReply }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               // user.language = "6537aba9f9a57f306182eaba";
               // await user.save();
-            } else if ((generalReply && generalReply.textEnglish == "No") || button_reply == "No") {
-              let actualReply = `I'm sorry to hear that. 😔 We will look to improve ourselves in the future. We're here to assist you better. Have a great day!`;
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+            } else if ((generalReply && generalReply.textEnglish == 'No') || button_reply == 'No') {
+              let actualReply = 'I\'m sorry to hear that. 😔 We will look to improve ourselves in the future. We\'re here to assist you better. Have a great day!'
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
               }
               const logsObj = {
                 userId: user._id,
-                userReply: "No",
-              };
-              const logs = new HelpfulLogs(logsObj);
-              await logs.save();
+                userReply: 'No'
+              }
+              const logs = new HelpfulLogs(logsObj)
+              await logs.save()
               // if (userLanguage != "English") {
               //   let textData = await this.languageTranslator(
               //     userLanguage,
@@ -1069,86 +1069,86 @@ class PineconeChatbot {
               //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
               // }
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
+                  messaging_product: 'whatsapp',
                   to: from,
-                  text: { body: actualReply },
+                  text: { body: actualReply }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               // user.language = "6537aba9f9a57f306182eaba";
               // await user.save();
             } else if (userPolicy) {
-              let actualReply = "";
-              let actualBot = "Priya";
-              let actualButton = "FAQ";
+              let actualReply = ''
+              let actualBot = 'Priya'
+              let actualButton = 'FAQ'
               // const objectId = msg_reply_id
               // const policy = await Policy.findById(objectId)
               if (userDocIds.includes(userPolicy._id.toString())) {
                 // actualReply = `Great! Here are some of the most frequently asked questions (FAQs) of your ${userPolicy.name} to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`;
-                actualReply = `Great! Here are some of the most frequently asked questions (FAQs) of your policy to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`;
+                actualReply = 'Great! Here are some of the most frequently asked questions (FAQs) of your policy to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I\'m here to assist you with any queries you may have. Just let me know how I can help!'
               } else {
                 actualReply =
-                  "Invalid Document Id. Please upload your document and try again";
+                  'Invalid Document Id. Please upload your document and try again'
               }
               let existingDocId = await DocumentId.findOne({
                 userId: user._id,
-                docId: userPolicy._id,
-              });
+                docId: userPolicy._id
+              })
               if (!existingDocId) {
                 const docObj = {
                   docId: userPolicy._id,
                   userId: user._id,
-                  status: "Success",
-                };
-                existingDocId = new DocumentId(docObj);
+                  status: 'Success'
+                }
+                existingDocId = new DocumentId(docObj)
                 // console.log('******', existingDocId)
-                await existingDocId.save();
+                await existingDocId.save()
               } else {
-                existingDocId.updatedAt = Date.now();
-                await existingDocId.save();
+                existingDocId.updatedAt = Date.now()
+                await existingDocId.save()
               }
               const faqs = await FAQ.find({
-                status: "Active",
-                policyId: userPolicy._id,
-              });
-              let faqQuestions = [];
+                status: 'Active',
+                policyId: userPolicy._id
+              })
+              let faqQuestions = []
               faqs.forEach((faq, i) => {
                 const obj = {
                   id: faq._id,
                   title: `FAQ ${i + 1}`,
-                  description: faq.question,
-                };
-                faqQuestions.push(obj);
-              });
+                  description: faq.question
+                }
+                faqQuestions.push(obj)
+              })
               const faqNames = faqQuestions.map((faq) => {
-                return faq.description;
-              });
-              const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-              if(realReply){
+                return faq.description
+              })
+              const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+              if (realReply) {
                 actualReply = realReply.text
                 actualBot = realReply.bot,
                 actualButton = realReply.button
               }
-              if (userLanguage != "English") {
+              if (userLanguage != 'English') {
                 faqQuestions = []
                 faqs.forEach((faq, i) => {
                   const fieldName = `question${userLanguage}`
                   const obj = {
                     id: faq._id,
                     title: `FAQ ${i + 1}`,
-                    description: faq[fieldName],
-                  };
-                  faqQuestions.push(obj);
-                });
+                    description: faq[fieldName]
+                  }
+                  faqQuestions.push(obj)
+                })
                 // let textData = await this.languageTranslator(
                 //   userLanguage,
                 //   actualReply,
@@ -1197,40 +1197,40 @@ class PineconeChatbot {
               // console.log(faqQuestions);
               // console.log(userPolicy);
               await axios({
-                method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+                method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
-                  "https://graph.facebook.com/v18.0/" +
+                  'https://graph.facebook.com/v18.0/' +
                   phone_number_id +
-                  "/messages",
+                  '/messages',
                 data: {
-                  messaging_product: "whatsapp",
-                  recipient_type: "individual",
+                  messaging_product: 'whatsapp',
+                  recipient_type: 'individual',
                   to: from,
-                  type: "interactive",
+                  type: 'interactive',
                   interactive: {
-                    type: "list",
+                    type: 'list',
                     header: {
-                      type: "text",
-                      text: actualBot,
+                      type: 'text',
+                      text: actualBot
                     },
                     body: {
-                      text: actualReply,
+                      text: actualReply
                     },
                     action: {
                       button: actualButton,
                       sections: [
                         {
-                          rows: faqQuestions,
-                        },
-                      ],
-                    },
-                  },
+                          rows: faqQuestions
+                        }
+                      ]
+                    }
+                  }
                 },
                 headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-              });
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`
+                }
+              })
               // await axios({
               //   method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
               //   url:
@@ -1311,9 +1311,9 @@ class PineconeChatbot {
           }
         } else {
           // let actualReply = `Hey ${user.name}! 👋 To begin a new conversation, please send a 'Hey' or a 'Hi' and I will be able to assist you.`;
-          let actualReply = `Hey! 👋 To begin a new conversation, please send a 'Hey' or a 'Hi' and I will be able to assist you.`;
-          const realReply = await GeneralReplies.findOne({textEnglish: actualReply, language: user.language._id})
-          if(realReply){
+          let actualReply = 'Hey! 👋 To begin a new conversation, please send a \'Hey\' or a \'Hi\' and I will be able to assist you.'
+          const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
+          if (realReply) {
             actualReply = realReply.text
           }
           // if (userLanguage != "English") {
@@ -1335,73 +1335,73 @@ class PineconeChatbot {
           //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
           // }
           await axios({
-            method: "POST", // Required, HTTP method, a string, e.g. POST, GET
+            method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
             url:
-              "https://graph.facebook.com/v18.0/" +
+              'https://graph.facebook.com/v18.0/' +
               phone_number_id +
-              "/messages",
+              '/messages',
             data: {
-              messaging_product: "whatsapp",
+              messaging_product: 'whatsapp',
               to: from,
-              text: { body: actualReply },
+              text: { body: actualReply }
             },
             headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          });
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            }
+          })
         }
       }
-      return "Success";
+      return 'Success'
     } else {
       // Return a '404 Not Found' if event is not from a WhatsApp API
-      return "Not found";
+      return 'Not found'
     }
   }
 
-  async verifyWebhook(query) {
-    const myToken = process.env.MY_TOKEN;
-    const mode = query["hub.mode"];
-    const challenge = query["hub.challenge"];
-    const token = query["hub.verify_token"];
+  async verifyWebhook (query) {
+    const myToken = process.env.MY_TOKEN
+    const mode = query['hub.mode']
+    const challenge = query['hub.challenge']
+    const token = query['hub.verify_token']
 
     if (mode && token) {
-      if (mode == "subscribe" && token == myToken) {
-        return challenge;
+      if (mode == 'subscribe' && token == myToken) {
+        return challenge
       } else {
-        return "Errorrrr";
+        return 'Errorrrr'
       }
     }
   }
 
-  async pushDataToPineconeIndex(index_name, documentData, userId) {
+  async pushDataToPineconeIndex (index_name, documentData, userId) {
     try {
-      const data = [];
-      let rawData;
+      const data = []
+      let rawData
       if (documentData.length != undefined) {
         for (let i = 0; i < documentData.length; i++) {
-          const doc = documentData[i];
-          rawData = await pdfParse(doc);
-          data.push(rawData.text.trim());
+          const doc = documentData[i]
+          rawData = await pdfParse(doc)
+          data.push(rawData.text.trim())
         }
       } else {
-        rawData = await pdfParse(documentData);
-        data.push(rawData.text.trim());
+        rawData = await pdfParse(documentData)
+        data.push(rawData.text.trim())
       }
-      const index = pinecone.Index(index_name);
-      const batch_size = 50;
-      const finalContext = data.join(" ");
+      const index = pinecone.Index(index_name)
+      const batch_size = 50
+      const finalContext = data.join(' ')
       const splitter = new RecursiveCharacterTextSplitter({
         chunkSize: 1000,
-        chunkOverlap: 100,
-      });
+        chunkOverlap: 100
+      })
       const docs = await splitter.splitDocuments([
-        new Document({ pageContent: finalContext }),
-      ]);
+        new Document({ pageContent: finalContext })
+      ])
       for (const doc of docs) {
         doc.id = Math.random()
           .toString(36)
-          .substring(2, 12 + 2);
+          .substring(2, 12 + 2)
       }
 
       //   await User.findByIdAndUpdate(userId, { $set: { insuranceDocs: docs } });
@@ -1409,199 +1409,203 @@ class PineconeChatbot {
         insuranceDocs: docs.map((doc) => {
           const obj = {
             id: doc.id,
-            metadata: doc.metadata,
-          };
-          return obj;
-        }),
-      };
-      const newPolicy = new Policy(policyObj);
-      await newPolicy.save();
+            metadata: doc.metadata
+          }
+          return obj
+        })
+      }
+      const newPolicy = new Policy(policyObj)
+      await newPolicy.save()
 
       for (let i = 0; i < docs.length; i += batch_size) {
-        const i_end = Math.min(docs.length, i + batch_size);
-        const meta_batch = docs.slice(i, i_end);
-        const ids_batch = meta_batch.map((x) => x.id);
-        const texts_batch = meta_batch.map((x) => x.pageContent);
-        let response;
+        const i_end = Math.min(docs.length, i + batch_size)
+        const meta_batch = docs.slice(i, i_end)
+        const ids_batch = meta_batch.map((x) => x.id)
+        const texts_batch = meta_batch.map((x) => x.pageContent)
+        let response
         try {
           response = await openai.createEmbedding({
-            model: "text-embedding-ada-002",
-            input: texts_batch,
-          });
+            model: 'text-embedding-ada-002',
+            input: texts_batch
+          })
         } catch (error) {
-          const done = false;
+          const done = false
           while (!done) {
-            await this.sleep(5);
+            await this.sleep(5)
             try {
               response = await openai.createEmbedding({
-                model: "text-embedding-ada-002",
-                input: texts_batch,
-              });
+                model: 'text-embedding-ada-002',
+                input: texts_batch
+              })
             } catch (error) {
-              console.log(error.message);
+              console.log(error.message)
             }
           }
         }
-        const embeds = response.data.data.map((record) => record.embedding);
+        const embeds = response.data.data.map((record) => record.embedding)
         const meta_batch_cleaned = meta_batch.map((x) => ({
           pageContent: x.pageContent,
-          policyId: newPolicy._id,
-        }));
+          policyId: newPolicy._id
+        }))
         const to_upsert = ids_batch.map((id, i) => ({
           id: id,
           values: embeds[i],
-          metadata: meta_batch_cleaned[i],
-        }));
+          metadata: meta_batch_cleaned[i]
+        }))
         // const upsertRequest = {
         //   vectors: to_upsert,
         //   namespace: namespace,
         // };
         // console.log(upsertRequest.vectors[0])
-        await index.upsert(to_upsert);
-        console.log("Uploaded");
+        await index.upsert(to_upsert)
+        console.log('Uploaded')
       }
-      newPolicy.status = "Uploaded to Pinecone";
-      await newPolicy.save();
+      newPolicy.status = 'Uploaded to Pinecone'
+      await newPolicy.save()
       await User.findByIdAndUpdate(userId, {
-        $push: { insuranceDocs: newPolicy._id },
-      });
-      return "Successfully Uploaded";
+        $push: { insuranceDocs: newPolicy._id }
+      })
+      return 'Successfully Uploaded'
     } catch (err) {
-      console.log("Error in pushDataToPinecone function :: err", err.message);
-      throw new Error(err);
+      console.log('Error in pushDataToPinecone function :: err', err.message)
+      throw new Error(err)
     }
   }
 
-  async getTextFromPdf(documentData) {
-    const data = new Uint8Array(documentData.data);
-    const doc = await pdfjsLib.getDocument(data).promise;
-    const textContent = [];
+  async getTextFromPdf (documentData) {
+    const data = new Uint8Array(documentData.data)
+    const doc = await pdfjsLib.getDocument(data).promise
+    const textContent = []
 
     for (let i = 0; i < doc.numPages; i++) {
-      const page = await doc.getPage(i + 1);
-      const content = await page.getTextContent();
-      textContent.push(content.items.map((item) => item.str).join(""));
+      const page = await doc.getPage(i + 1)
+      const content = await page.getTextContent()
+      textContent.push(content.items.map((item) => item.str).join(''))
     }
-    return textContent.join("\n");
+    return textContent.join('\n')
   }
 
-  async askQuestionAboutDoc(indexName, question, userId, insuranceDocId, language) {
-    const user = await User.findById(userId);
+  async askQuestionAboutDoc (indexName, question, userId, insuranceDocId, language) {
+    const user = await User.findById(userId)
     if (user.insuranceDocs.includes(insuranceDocId)) {
       const qnaObj = {
         question: question,
         userId: userId,
-        insuranceDocs: insuranceDocId,
-      };
-      const newQuestion = new QnA(qnaObj);
-      await newQuestion.save();
-      const index = pinecone.Index(indexName);
+        insuranceDocs: insuranceDocId
+      }
+      const newQuestion = new QnA(qnaObj)
+      await newQuestion.save()
+      const index = pinecone.Index(indexName)
       let translatedQuestion = ''
       let response = ''
-      if(language!='English'){
+      if (language != 'English') {
         translatedQuestion = await this.translateQuestion(question)
         console.log(translatedQuestion.choices[0].message.content)
         response = await openai.createEmbedding({
-          model: "text-embedding-ada-002",
-          input: translatedQuestion.choices[0].message.content,
-        });
+          model: 'text-embedding-ada-002',
+          input: translatedQuestion.choices[0].message.content
+        })
       }
-      if(language == 'English'){
+      if (language == 'English') {
         response = await openai.createEmbedding({
-          model: "text-embedding-ada-002",
-          input: question,
-        });
+          model: 'text-embedding-ada-002',
+          input: question
+        })
       }
-      const xq = response.data.data[0].embedding;
+      const xq = response.data.data[0].embedding
       response = await index.query({
         vector: xq,
         filter: { policyId: insuranceDocId.toString() },
         topK: 2,
-        includeMetadata: true,
+        includeMetadata: true
         // includeValues: true
-      });
+      })
       const contexts = response.matches.map(
         (match) => match.metadata.pageContent
-      );
+      )
       // const scores = response.matches.map((match) => match.score)
-
-      const answer = await this.askChatGPT(contexts, question, language);
-      newQuestion.gptLogs = answer;
-      newQuestion.answer = answer.choices[0].message.content;
+      let answer = ''
+      if (language == 'English') {
+        answer = await this.askChatGPT(contexts, question, language)
+      } else {
+        answer = await this.askChatGPT(contexts, translatedQuestion.choices[0].message.content, language)
+      }
+      newQuestion.gptLogs = answer
+      newQuestion.answer = answer.choices[0].message.content
       console.log(newQuestion.answer)
-      await newQuestion.save();
+      await newQuestion.save()
       // return newQuestion;
-      return newQuestion.answer;
+      return newQuestion.answer
     }
-    return "User does not have such a policy";
+    return 'User does not have such a policy'
   }
 
-  async askChatGPT(question, context, language) {
+  async askChatGPT (question, context, language) {
     const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+      model: 'gpt-3.5-turbo',
       messages: [
         {
-          role: "system",
-          content: `Answer the question based on the context below and make sure the answer is in the ${language}`,
+          role: 'system',
+          content: `Answer the question based on the context below and make sure the answer is in the ${language}`
         },
         {
-          role: "user",
+          role: 'user',
           content: `Context: ${context}
-                      Question: ${question}`,
+                      Question: ${question}`
         },
         {
-          role: "assistant",
-          content: "Answer: ",
-        },
-      ],
-    });
-    return response.data;
+          role: 'assistant',
+          content: 'Answer: '
+        }
+      ]
+    })
+    return response.data
   }
 
-  async replyClassification(reply) {
+  async replyClassification (reply) {
     const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+      model: 'gpt-3.5-turbo',
       messages: [
         {
-          role: "system",
+          role: 'system',
           content:
-            "You are a sentiment classifier. Analyze the text given and classify it accordingly. The classification choices available to you are [Greeting, Question, Appreciation]. Give answer in 1 word only",
+            'You are a sentiment classifier. Analyze the text given and classify it accordingly. The classification choices available to you are [Greeting, Question, Appreciation]. Give answer in 1 word only'
         },
         {
-          role: "user",
-          content: `Text: ${reply}`,
+          role: 'user',
+          content: `Text: ${reply}`
         },
         {
-          role: "assistant",
-          content: "Answer: ",
-        },
-      ],
-    });
-    return response.data;
+          role: 'assistant',
+          content: 'Answer: '
+        }
+      ]
+    })
+    return response.data
   }
 
   async translateQuestion (question) {
     const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+      model: 'gpt-3.5-turbo',
       messages: [
         {
-          role: "system",
-          content: `Translate the given question to English Language`,
+          role: 'system',
+          content: 'Translate the given question to English Language'
         },
         {
-          role: "user",
-          content: `Question: ${question}`,
+          role: 'user',
+          content: `Question: ${question}`
         },
         {
-          role: "assistant",
-          content: "Answer: ",
-        },
-      ],
-    });
-    return response.data;
+          role: 'assistant',
+          content: 'Answer: '
+        }
+      ]
+    })
+    return response.data
   }
 
-  async languageTranslator(
+  async languageTranslator (
     language,
     reply,
     furtherReply,
@@ -1610,43 +1614,43 @@ class PineconeChatbot {
     button
   ) {
     let content =
-      'You are a language translator. First give me the converted reply and label it as "Reply:", then give me the converted options and label it as "Options:" and give me the options in one line without any serial numbers, then give me the converted bot and label it as "Bot:" and finally give me the converted button and label it as "Button:". Make sure all the labels like "Reply:", "Options:", etc. are in English.';
+      'You are a language translator. First give me the converted reply and label it as "Reply:", then give me the converted options and label it as "Options:" and give me the options in one line without any serial numbers, then give me the converted bot and label it as "Bot:" and finally give me the converted button and label it as "Button:". Make sure all the labels like "Reply:", "Options:", etc. are in English.'
     let newContent = `Reply: ${reply},
                       Options: ${options},
                       Bot: ${bot},
                       Button: ${button},
-                      Convert the above reply, options, bot and button from English to ${language} language`;
-    if (furtherReply != "") {
+                      Convert the above reply, options, bot and button from English to ${language} language`
+    if (furtherReply != '') {
       content =
-        'You are a language translator. First give me the converted reply and label it as "Reply:", then give me the converted further reply and label it as "Further:", then give me the converted options and label it as "Options:" and give me the options in one line without any serial numbers, then give me the converted bot and label it as "Bot:" and finally give me the converted button and label it as "Button:". Make sure all the labels like "Reply:", "Options:", etc. are in English.';
+        'You are a language translator. First give me the converted reply and label it as "Reply:", then give me the converted further reply and label it as "Further:", then give me the converted options and label it as "Options:" and give me the options in one line without any serial numbers, then give me the converted bot and label it as "Bot:" and finally give me the converted button and label it as "Button:". Make sure all the labels like "Reply:", "Options:", etc. are in English.'
       newContent = `Reply: ${reply},
                     Further: ${furtherReply},
                     Options: ${options},
                     Bot: ${bot},
                     Button: ${button},
-                    Convert the above reply, further, options, bot and button from English to ${language} language`;
+                    Convert the above reply, further, options, bot and button from English to ${language} language`
     }
     if (options.length == 0) {
       content =
-        'You are a language translator. Give me the converted reply and label it as "Reply:". Make sure all the labels like "Reply:" are in English.';
+        'You are a language translator. Give me the converted reply and label it as "Reply:". Make sure all the labels like "Reply:" are in English.'
       newContent = `Reply: ${reply},
-                    Convert the above reply from English to ${language} language`;
+                    Convert the above reply from English to ${language} language`
     }
     const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+      model: 'gpt-3.5-turbo',
       messages: [
         {
-          role: "system",
-          content: content,
+          role: 'system',
+          content: content
         },
         {
-          role: "user",
-          content: newContent,
-        },
-      ],
-    });
-    return response.data;
+          role: 'user',
+          content: newContent
+        }
+      ]
+    })
+    return response.data
   }
 }
 
-module.exports = new PineconeChatbot();
+module.exports = new PineconeChatbot()

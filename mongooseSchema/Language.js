@@ -4,12 +4,12 @@ const Schema = mongoose.Schema
 const schema = new Schema(
   {
     name: {
-        type: String
+      type: String
     },
     status: {
-        type: String,
-        default: 'enabled',
-        enum: ['enabled', 'disabled']
+      type: String,
+      default: 'enabled',
+      enum: ['enabled', 'disabled']
     }
   },
   { timestamps: true }

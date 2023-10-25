@@ -4,41 +4,41 @@ const Schema = mongoose.Schema
 const schema = new Schema(
   {
     userReply: {
-        type: String
+      type: String
     },
     text: {
-        type: String,
+      type: String
     },
     textEnglish: {
-        type: String,
+      type: String
     },
     moreText: {
-        type: String,
+      type: String
     },
     moreTextEnglish: {
-        type: String,
+      type: String
     },
     bot: {
-        type: String,
+      type: String
     },
     botEnglish: {
-        type: String,
+      type: String
     },
     button: {
-        type: String,
+      type: String
     },
     buttonEnglish: {
-        type: String,
+      type: String
     },
     status: {
-        type: String,
-        default: 'enabled',
-        enum: ['enabled', 'disabled']
+      type: String,
+      default: 'enabled',
+      enum: ['enabled', 'disabled']
     },
     language: {
-        type: Schema.Types.ObjectId,
-        ref: 'Language'
-    },
+      type: Schema.Types.ObjectId,
+      ref: 'Language'
+    }
   },
   { timestamps: true }
 )
