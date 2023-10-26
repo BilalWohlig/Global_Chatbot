@@ -174,99 +174,6 @@ class PineconeChatbot {
                 existingGreeting.message = msg_body
                 await existingGreeting.save()
               }
-              // const supportOptions = await Support.find({ status: 'Active' })
-              // const userSupportOptions = []
-              // supportOptions.forEach((option) => {
-              //   const obj = {
-              //     id: option._id,
-              //     title: option.name
-              //   }
-              //   userSupportOptions.push(obj)
-              // })
-              // await axios({
-              //   method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
-              //   url:
-              //     'https://graph.facebook.com/v18.0/' +
-              //     phone_number_id +
-              //     '/messages',
-              //   data: {
-              //     messaging_product: 'whatsapp',
-              //     recipient_type: 'individual',
-              //     to: from,
-              //     type: 'interactive',
-              //     interactive: {
-              //       type: 'list',
-              //       header: {
-              //         type: 'text',
-              //         text: 'Priya'
-              //       },
-              //       body: {
-              //         text: `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know what can I assist you with by choosing from the options below`
-              //       },
-              //       action: {
-              //         button: 'Options',
-              //         sections: [
-              //           {
-              //             rows: userSupportOptions
-              //           }
-              //         ]
-              //       }
-              //     }
-              //   },
-              //   headers: {
-              //     'Content-Type': 'application/json',
-              //     Authorization: `Bearer ${token}`
-              //   }
-              // })
-
-              // AFTER CHOOSING LANGUAGE
-
-              // const allUserDocs = user.insuranceDocs;
-              // const userOptions = [];
-              // allUserDocs.forEach((doc) => {
-              //   const obj = {
-              //     id: doc._id.toString(),
-              //     title: doc.name,
-              //   };
-              //   userOptions.push(obj);
-              // });
-              // console.log("*************", userOptions);
-              // await axios({
-              //   method: "POST", // Required, HTTP method, a string, e.g. POST, GET
-              //   url:
-              //     "https://graph.facebook.com/v18.0/" +
-              //     phone_number_id +
-              //     "/messages",
-              //   data: {
-              //     messaging_product: "whatsapp",
-              //     recipient_type: "individual",
-              //     to: from,
-              //     type: "interactive",
-              //     interactive: {
-              //       type: "list",
-              //       header: {
-              //         type: "text",
-              //         text: "Priya",
-              //       },
-              //       body: {
-              //         text: `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know which policy do you have questions about. I'm here to help you with any questions or concerns you may have related to our policies.`,
-              //       },
-              //       action: {
-              //         button: "Options",
-              //         sections: [
-              //           {
-              //             rows: userOptions,
-              //           },
-              //         ],
-              //       },
-              //     },
-              //   },
-              //   headers: {
-              //     "Content-Type": "application/json",
-              //     Authorization: `Bearer ${token}`,
-              //   },
-              // });
-
               const allLanguages = await Language.find({ status: 'enabled' })
               const languageOptions = []
               allLanguages.forEach((language) => {
@@ -475,9 +382,6 @@ class PineconeChatbot {
                 }
                 userOptions.push(obj)
               })
-              // const optionNames = userOptions.map((option) => {
-              //   return option.title;
-              // });
               if (userLanguage != 'English') {
                 userOptions = []
                 allUserDocs.forEach((doc) => {
@@ -487,51 +391,6 @@ class PineconeChatbot {
                   }
                   userOptions.push(obj)
                 })
-                // let textData = await this.languageTranslator(
-                //   userLanguage,
-                //   actualReply,
-                //   "",
-                //   optionNames,
-                //   "Priya",
-                //   "Options"
-                // );
-                // textData = textData.choices[0].message.content;
-                // // console.log(textData)
-                // const reply = "Reply:";
-                // const options = "Options:";
-                // const bot = "Bot:";
-                // const button = "Button:";
-                // const replyStart = textData.indexOf("Reply:") + reply.length;
-                // const replyEnd = textData.indexOf("Options:");
-                // const optionsStart =
-                //   textData.indexOf("Options:") + options.length;
-                // const optionsEnd = textData.indexOf("Bot:");
-                // const botStart = textData.indexOf("Bot:") + bot.length;
-                // const botEnd = textData.indexOf("Button:");
-                // const buttonStart = textData.indexOf("Button:") + button.length;
-
-                // actualReply = textData.substring(replyStart, replyEnd);
-                // let actualOptions = textData.substring(
-                //   optionsStart,
-                //   optionsEnd
-                // );
-                // actualBot = textData.substring(botStart, botEnd);
-                // actualButton = textData.substring(buttonStart);
-                // actualReply = actualReply.trim();
-                // actualOptions = actualOptions.trim();
-                // actualBot = actualBot.trim();
-                // actualButton = actualButton.trim();
-                // actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-                // actualOptions = actualOptions.replace(/(\r\n|\n|\r)/gm, "");
-                // actualBot = actualBot.replace(/(\r\n|\n|\r)/gm, "");
-                // actualButton = actualButton.replace(/(\r\n|\n|\r)/gm, "");
-
-                // let optionsArray = actualOptions.split(",");
-                // for (let i = 0; i < optionsArray.length; i++) {
-                //   let option = optionsArray[i];
-                //   option = option.trim();
-                //   userOptions[i].title = option;
-                // }
               }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
@@ -580,9 +439,6 @@ class PineconeChatbot {
                 }
                 userOptions.push(obj)
               })
-              // const optionNames = userOptions.map((option) => {
-              //   return option.title;
-              // });
               // let actualReply = `Hello ${user.name}! My name is Priya, it's great to have you here. Please let me know which policy do you have questions about. I'm here to help you with any questions or concerns you may have related to our policies.`;
               let actualReply = 'Great! Please let me know which policy do you have questions about. I\'m here to help you with any questions or concerns you may have related to our policies.'
               let actualBot = 'Priya'
@@ -602,51 +458,6 @@ class PineconeChatbot {
                   }
                   userOptions.push(obj)
                 })
-                // let textData = await this.languageTranslator(
-                //   msg_reply,
-                //   actualReply,
-                //   "",
-                //   optionNames,
-                //   "Priya",
-                //   "Options"
-                // );
-                // textData = textData.choices[0].message.content;
-                // // console.log(textData)
-                // const reply = "Reply:";
-                // const options = "Options:";
-                // const bot = "Bot:";
-                // const button = "Button:";
-                // const replyStart = textData.indexOf("Reply:") + reply.length;
-                // const replyEnd = textData.indexOf("Options:");
-                // const optionsStart =
-                //   textData.indexOf("Options:") + options.length;
-                // const optionsEnd = textData.indexOf("Bot:");
-                // const botStart = textData.indexOf("Bot:") + bot.length;
-                // const botEnd = textData.indexOf("Button:");
-                // const buttonStart = textData.indexOf("Button:") + button.length;
-
-                // actualReply = textData.substring(replyStart, replyEnd);
-                // let actualOptions = textData.substring(
-                //   optionsStart,
-                //   optionsEnd
-                // );
-                // actualBot = textData.substring(botStart, botEnd);
-                // actualButton = textData.substring(buttonStart);
-                // actualReply = actualReply.trim();
-                // actualOptions = actualOptions.trim();
-                // actualBot = actualBot.trim();
-                // actualButton = actualButton.trim();
-                // actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-                // actualOptions = actualOptions.replace(/(\r\n|\n|\r)/gm, "");
-                // actualBot = actualBot.replace(/(\r\n|\n|\r)/gm, "");
-                // actualButton = actualButton.replace(/(\r\n|\n|\r)/gm, "");
-
-                // let optionsArray = actualOptions.split(",");
-                // for (let i = 0; i < optionsArray.length; i++) {
-                //   let option = optionsArray[i];
-                //   option = option.trim();
-                //   userOptions[i].title = option;
-                // }
               }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
@@ -701,24 +512,6 @@ class PineconeChatbot {
               if (realReply) {
                 actualReply = realReply.text
               }
-              // if (userLanguage != "English") {
-              //   let textData = await this.languageTranslator(
-              //     userLanguage,
-              //     actualReply,
-              //     "",
-              //     [],
-              //     "",
-              //     ""
-              //   );
-              //   textData = textData.choices[0].message.content;
-              //   console.log(textData);
-              //   const reply = "Reply:";
-              //   const replyStart = textData.indexOf("Reply:") + reply.length;
-
-              //   actualReply = textData.substring(replyStart);
-              //   actualReply = actualReply.trim();
-              //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-              // }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -772,9 +565,6 @@ class PineconeChatbot {
                   title: 'End Conversation'
                 }
               ]
-              // const userChoicesNames = userQuestionChoices.map((choice) => {
-              //   return choice.title;
-              // });
               const realReply = await GeneralReplies.findOne({ textEnglish: actualFurther, language: user.language._id })
               if (realReply) {
                 actualFurther = realReply.text
@@ -790,57 +580,6 @@ class PineconeChatbot {
                   const reply = await GeneralReplies.findOne({ status: 'enabled', textEnglish: element.title, language: user.language._id })
                   userQuestionChoices[i].title = reply.text
                 }
-                // let textData = await this.languageTranslator(
-                //   userLanguage,
-                //   actualReply,
-                //   actualFurther,
-                //   userChoicesNames,
-                //   "Priya",
-                //   "Choose"
-                // );
-                // textData = textData.choices[0].message.content;
-                // const reply = "Reply:";
-                // const further = "Further:";
-                // const options = "Options:";
-                // const bot = "Bot:";
-                // const button = "Button:";
-                // const replyStart = textData.indexOf("Reply:") + reply.length;
-                // const replyEnd = textData.indexOf("Further:");
-                // const furtherStart =
-                //   textData.indexOf("Further:") + further.length;
-                // const furtherEnd = textData.indexOf("Options:");
-                // const optionsStart =
-                //   textData.indexOf("Options:") + options.length;
-                // const optionsEnd = textData.indexOf("Bot:");
-                // const botStart = textData.indexOf("Bot:") + bot.length;
-                // const botEnd = textData.indexOf("Button:");
-                // const buttonStart = textData.indexOf("Button:") + button.length;
-
-                // actualReply = textData.substring(replyStart, replyEnd);
-                // actualFurther = textData.substring(furtherStart, furtherEnd);
-                // let actualOptions = textData.substring(
-                //   optionsStart,
-                //   optionsEnd
-                // );
-                // actualBot = textData.substring(botStart, botEnd);
-                // actualButton = textData.substring(buttonStart);
-                // actualReply = actualReply.trim();
-                // actualFurther = actualFurther.trim();
-                // actualOptions = actualOptions.trim();
-                // actualBot = actualBot.trim();
-                // actualButton = actualButton.trim();
-                // actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-                // actualFurther = actualFurther.replace(/(\r\n|\n|\r)/gm, "");
-                // actualOptions = actualOptions.replace(/(\r\n|\n|\r)/gm, "");
-                // actualBot = actualBot.replace(/(\r\n|\n|\r)/gm, "");
-                // actualButton = actualButton.replace(/(\r\n|\n|\r)/gm, "");
-
-                // let optionsArray = actualOptions.split(",");
-                // for (let i = 0; i < optionsArray.length; i++) {
-                //   let option = optionsArray[i];
-                //   option = option.trim();
-                //   userQuestionChoices[i].title = option;
-                // }
               }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
@@ -918,51 +657,13 @@ class PineconeChatbot {
                   }
                 }
               ]
-              // const buttonNames = buttonOptions.map((button) => {
-              //   return button.reply.title;
-              // });
               if (userLanguage != 'English') {
                 for (let i = 0; i < buttonOptions.length; i++) {
                   const element = buttonOptions[i]
                   const reply = await GeneralReplies.findOne({ status: 'enabled', textEnglish: element.reply.title, language: user.language._id })
                   buttonOptions[i].reply.title = reply.text
                 }
-                // let textData = await this.languageTranslator(
-                //   userLanguage,
-                //   actualReply,
-                //   "",
-                //   buttonNames,
-                //   "",
-                //   ""
-                // );
-                // textData = textData.choices[0].message.content;
-                // console.log(textData);
-                // const reply = "Reply:";
-                // const options = "Options:";
-                // const replyStart = textData.indexOf("Reply:") + reply.length;
-                // const replyEnd = textData.indexOf("Options:");
-                // const optionsStart =
-                //   textData.indexOf("Options:") + options.length;
-                // const optionsEnd = textData.indexOf("Bot:");
-
-                // actualReply = textData.substring(replyStart, replyEnd);
-                // let actualOptions = textData.substring(
-                //   optionsStart,
-                //   optionsEnd
-                // );
-                // actualReply = actualReply.trim();
-                // actualOptions = actualOptions.trim();
-                // actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-                // actualOptions = actualOptions.replace(/(\r\n|\n|\r)/gm, "");
-                // let optionsArray = actualOptions.split(",");
-                // console.log(optionsArray, optionsArray.length);
-                // for (let i = 0; i < optionsArray.length; i++) {
-                //   let option = optionsArray[i];
-                //   option = option.trim();
-                //   buttonOptions[i].reply.title = option;
-                // }
               }
-              // console.log(buttonOptions);
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -1002,24 +703,6 @@ class PineconeChatbot {
               }
               const logs = new HelpfulLogs(logsObj)
               await logs.save()
-              // if (userLanguage != "English") {
-              //   let textData = await this.languageTranslator(
-              //     userLanguage,
-              //     actualReply,
-              //     "",
-              //     [],
-              //     "",
-              //     ""
-              //   );
-              //   textData = textData.choices[0].message.content;
-              //   console.log(textData);
-              //   const reply = "Reply:";
-              //   const replyStart = textData.indexOf("Reply:") + reply.length;
-
-              //   actualReply = textData.substring(replyStart);
-              //   actualReply = actualReply.trim();
-              //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-              // }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -1036,8 +719,6 @@ class PineconeChatbot {
                   Authorization: `Bearer ${token}`
                 }
               })
-              // user.language = "6537aba9f9a57f306182eaba";
-              // await user.save();
             } else if ((generalReply && generalReply.textEnglish == 'No') || button_reply == 'No') {
               let actualReply = 'I\'m sorry to hear that. 😔 We will look to improve ourselves in the future. We\'re here to assist you better. Have a great day!'
               const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
@@ -1050,24 +731,6 @@ class PineconeChatbot {
               }
               const logs = new HelpfulLogs(logsObj)
               await logs.save()
-              // if (userLanguage != "English") {
-              //   let textData = await this.languageTranslator(
-              //     userLanguage,
-              //     actualReply,
-              //     "",
-              //     [],
-              //     "",
-              //     ""
-              //   );
-              //   textData = textData.choices[0].message.content;
-              //   console.log(textData);
-              //   const reply = "Reply:";
-              //   const replyStart = textData.indexOf("Reply:") + reply.length;
-
-              //   actualReply = textData.substring(replyStart);
-              //   actualReply = actualReply.trim();
-              //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-              // }
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -1084,14 +747,10 @@ class PineconeChatbot {
                   Authorization: `Bearer ${token}`
                 }
               })
-              // user.language = "6537aba9f9a57f306182eaba";
-              // await user.save();
             } else if (userPolicy) {
               let actualReply = ''
               let actualBot = 'Priya'
               let actualButton = 'FAQ'
-              // const objectId = msg_reply_id
-              // const policy = await Policy.findById(objectId)
               if (userDocIds.includes(userPolicy._id.toString())) {
                 // actualReply = `Great! Here are some of the most frequently asked questions (FAQs) of your ${userPolicy.name} to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`;
                 actualReply = 'Great! Here are some of the most frequently asked questions (FAQs) of your policy to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I\'m here to assist you with any queries you may have. Just let me know how I can help!'
@@ -1110,7 +769,6 @@ class PineconeChatbot {
                   status: 'Success'
                 }
                 existingDocId = new DocumentId(docObj)
-                // console.log('******', existingDocId)
                 await existingDocId.save()
               } else {
                 existingDocId.updatedAt = Date.now()
@@ -1129,9 +787,6 @@ class PineconeChatbot {
                 }
                 faqQuestions.push(obj)
               })
-              const faqNames = faqQuestions.map((faq) => {
-                return faq.description
-              })
               const realReply = await GeneralReplies.findOne({ textEnglish: actualReply, language: user.language._id })
               if (realReply) {
                 actualReply = realReply.text
@@ -1149,53 +804,7 @@ class PineconeChatbot {
                   }
                   faqQuestions.push(obj)
                 })
-                // let textData = await this.languageTranslator(
-                //   userLanguage,
-                //   actualReply,
-                //   "",
-                //   faqNames,
-                //   "Priya",
-                //   "Questions"
-                // );
-                // textData = textData.choices[0].message.content;
-                // const reply = "Reply:";
-                // const options = "Options:";
-                // const bot = "Bot:";
-                // const button = "Button:";
-                // const replyStart = textData.indexOf("Reply:") + reply.length;
-                // const replyEnd = textData.indexOf("Options:");
-                // const optionsStart =
-                //   textData.indexOf("Options:") + options.length;
-                // const optionsEnd = textData.indexOf("Bot:");
-                // const botStart = textData.indexOf("Bot:") + bot.length;
-                // const botEnd = textData.indexOf("Button:");
-                // const buttonStart = textData.indexOf("Button:") + button.length;
-
-                // actualReply = textData.substring(replyStart, replyEnd);
-                // let actualOptions = textData.substring(
-                //   optionsStart,
-                //   optionsEnd
-                // );
-                // actualBot = textData.substring(botStart, botEnd);
-                // actualButton = textData.substring(buttonStart);
-                // actualReply = actualReply.trim();
-                // actualOptions = actualOptions.trim();
-                // actualBot = actualBot.trim();
-                // actualButton = actualButton.trim();
-                // actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-                // actualOptions = actualOptions.replace(/(\r\n|\n|\r)/gm, "");
-                // actualBot = actualBot.replace(/(\r\n|\n|\r)/gm, "");
-                // actualButton = actualButton.replace(/(\r\n|\n|\r)/gm, "");
-
-                // let optionsArray = actualOptions.split(",");
-                // for (let i = 0; i < optionsArray.length; i++) {
-                //   let option = optionsArray[i];
-                //   option = option.trim();
-                //   faqQuestions[i].description = option;
-                // }
               }
-              // console.log(faqQuestions);
-              // console.log(userPolicy);
               await axios({
                 method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
                 url:
@@ -1231,82 +840,6 @@ class PineconeChatbot {
                   Authorization: `Bearer ${token}`
                 }
               })
-              // await axios({
-              //   method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
-              //   url:
-              //     'https://graph.facebook.com/v18.0/' +
-              //     phone_number_id +
-              //     '/messages',
-              //   data: {
-              //     messaging_product: 'whatsapp',
-              //     to: from,
-              //     text: {
-              //       body: `Great! Here are some of the most frequently asked questions (FAQs) of your ${userPolicy.name} to get you started. If you still have a question or need more clarification, you can type and ask your specific question. I'm here to assist you with any queries you may have. Just let me know how I can help!`
-              //     }
-              //   },
-              //   headers: {
-              //     'Content-Type': 'application/json',
-              //     Authorization: `Bearer ${token}`
-              //   }
-              // })
-              // if (faqs.length > 0) {
-              //   for (let i = 0; i < faqs.length; i++) {
-              //     const faq = faqs[i]
-              //     await axios({
-              //       method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
-              //       url:
-              //         'https://graph.facebook.com/v18.0/' +
-              //         phone_number_id +
-              //         '/messages',
-              //       data: {
-              //         messaging_product: 'whatsapp',
-              //         recipient_type: 'individual',
-              //         to: from,
-              //         type: 'interactive',
-              //         interactive: {
-              //           type: 'button',
-              //           body: {
-              //             text: `Q${i + 1}. ${faq.question}`
-              //           },
-              //           action: {
-              //             buttons: [
-              //               {
-              //                 type: 'reply',
-              //                 reply: {
-              //                   id: faq._id,
-              //                   title: `FAQ ${i + 1} Answer`
-              //                 }
-              //               }
-              //             ]
-              //           }
-              //         }
-              //       },
-              //       headers: {
-              //         'Content-Type': 'application/json',
-              //         Authorization: `Bearer ${token}`
-              //       }
-              //     })
-              //   }
-              // } else {
-              //   await axios({
-              //     method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
-              //     url:
-              //       'https://graph.facebook.com/v18.0/' +
-              //       phone_number_id +
-              //       '/messages',
-              //     data: {
-              //       messaging_product: 'whatsapp',
-              //       to: from,
-              //       text: {
-              //         body: `Currently, there are no FAQs available for ${userPolicy.name}. Feel free to type your question, and we'll be happy to assist you.`
-              //       }
-              //     },
-              //     headers: {
-              //       'Content-Type': 'application/json',
-              //       Authorization: `Bearer ${token}`
-              //     }
-              //   })
-              // }
             }
           }
         } else {
@@ -1316,24 +849,6 @@ class PineconeChatbot {
           if (realReply) {
             actualReply = realReply.text
           }
-          // if (userLanguage != "English") {
-          //   let textData = await this.languageTranslator(
-          //     userLanguage,
-          //     actualReply,
-          //     "",
-          //     [],
-          //     "",
-          //     ""
-          //   );
-          //   textData = textData.choices[0].message.content;
-          //   console.log(textData);
-          //   const reply = "Reply:";
-          //   const replyStart = textData.indexOf("Reply:") + reply.length;
-
-          //   actualReply = textData.substring(replyStart);
-          //   actualReply = actualReply.trim();
-          //   actualReply = actualReply.replace(/(\r\n|\n|\r)/gm, "");
-          // }
           await axios({
             method: 'POST', // Required, HTTP method, a string, e.g. POST, GET
             url:
